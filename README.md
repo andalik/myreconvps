@@ -8,8 +8,8 @@
 </pre>
 
 
-Dependências e pacotes terceiros instalados:<br>
-(obtidos via repositório oficial no GitHub)<br>
+## Dependências e Pacotes Terceiros Instalados
+Obtidos via repositório oficial no GitHub:<br>
 
 ubuntu-update<br>
 basic-tools<br>
@@ -91,5 +91,5 @@ assetnote-wordlists<br>
 seclists<br>
 resolvers<br>
 
-ATUALIZAÇÃO DOS PACOTES OBTIDOS VIA GITHUB:<br>
+## Atualização dos Pacotes Obtidos via GITHUB
 Sempre que for necessário atualizar os pacotes já instalados, basta reexecutar o script de instalação.
