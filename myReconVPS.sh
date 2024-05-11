@@ -18,7 +18,7 @@ declare -a order
 #  | aponta para o arquivo de configuracao de sessao utilizado pelo shell
 #  | (.profile, .bashrc ou .zshrc) 
 
-# ULTIMA ATUALIZACAO: 10/05/2024
+# ULTIMA ATUALIZACAO: 11/05/2024
 
 # ========== INICIO DA AREA EDITAVEL ===========
 
@@ -120,7 +120,7 @@ commands["naabu"]="apt-get -y install libpcap-dev ; go install -v github.com/pro
 
 commands["nilo"]="go install github.com/ferreiraklet/nilo@latest && mkdir /opt/nilo ; mv -f ~/go/bin/nilo /opt/nilo/ && grep -q 'export PATH=\$PATH:/opt/nilo' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/nilo' >> \$CONFIG_FILE"
 
-commands["nmap"]="apt-get -y install build-essential libssl-dev automake libffi-dev libncurses5-dev zlib1g zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev liblua5.3-dev libbpfcc-dev libpcap-dev libcfg-dev libssh2-1-dev libpcre3-dev python3-venv make gcc && pip3 install build && git clone https://github.com/nmap/nmap.git && cd nmap && ./configure && make && make install && cd .. && cp -rf nmap/ /opt/ && rm -rf nmap"
+commands["nmap"]="apt-get -y install build-essential libssl-dev automake libffi-dev libncurses5-dev zlib1g zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev liblua5.3-dev libbpfcc-dev libpcap-dev libcfg-dev libssh2-1-dev libpcre3-dev libcairo2-dev pkg-config python3-dev python3-venv make gcc && pip3 install build && git clone https://github.com/nmap/nmap.git && cd nmap && make uninstall ; rm -f /usr/local/bin/zenmap ; rm -f /usr/local/share/zenmap ; python_dir=\$(ls /usr/local/lib | grep 'python' | sort -r | head -n 1) ; sudo rm -rf /usr/local/lib/\$python_dir/dist-packages/zenmap* ; ./configure && make && make install && cd .. && rm -rf nmap"
 
 commands["notify"]="go install -v github.com/projectdiscovery/notify/cmd/notify@latest && mkdir /opt/notify ; mv -f ~/go/bin/notify /opt/notify/ && grep -q 'export PATH=\$PATH:/opt/notify' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/notify' >> \$CONFIG_FILE"
 
