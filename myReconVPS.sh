@@ -20,7 +20,8 @@ SECONDS=0
 #  | aponta para o arquivo de configuracao de sessao utilizado pelo shell
 #  | (.profile, .bashrc ou .zshrc) 
 
-# ULTIMA ATUALIZACAO: 27/05/2024
+# ULTIMA ATUALIZACAO: 14/08/2024
+# Remoção temporária do wfuzz do ciclo de instalação (erro: pyparsing (>=2.4*) ; python_version >= "3.5")
 
 # ========== INICIO DA AREA EDITAVEL ===========
 
@@ -49,6 +50,8 @@ commands["arjun"]="pip3 install arjun"
 commands["assetfinder"]="go install github.com/tomnomnom/assetfinder@latest && mkdir /opt/assetfinder ; mv -f ~/go/bin/assetfinder /opt/assetfinder/ && grep -q 'export PATH=\$PATH:/opt/assetfinder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/assetfinder' >> \$CONFIG_FILE"
 
 commands["cdncheck"]="go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest && mkdir /opt/cdncheck ; mv -f ~/go/bin/cdncheck /opt/cdncheck/ && grep -q 'export PATH=\$PATH:/opt/cdncheck' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/cdncheck' >> \$CONFIG_FILE"
+
+commands["cent"]="go install -v github.com/xm1k3/cent@latest && mkdir /opt/cent ; mv -f ~/go/bin/cent /opt/cent/ && grep -q 'export PATH=\$PATH:/opt/cent' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/cent' >> \$CONFIG_FILE"
 
 commands["cf-check"]="go install github.com/dwisiswant0/cf-check@latest && mkdir /opt/cf-check ; mv -f ~/go/bin/cf-check /opt/cf-check/ && grep -q 'export PATH=\$PATH:/opt/cf-check' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/cf-check' >> \$CONFIG_FILE"
 
@@ -233,7 +236,7 @@ commands["resolvers"]="wget https://raw.githubusercontent.com/trickest/resolvers
 
 
 # Selecao e Ordem de Instalacao
-order=("ubuntu-update" "basic-tools" "snap-refresh" "go" "python3" "airixss" "amass" "anew" "archivefuzz" "arjun" "assetfinder" "cdncheck" "cf-check" "chaos" "dalfox" "dirsearch" "dnsdumpster" "dnsexpire" "dnsgen" "dnspy" "dnsvalidator" "dnsx" "exif" "exploitdb" "ffuf" "findomain" "freq" "gau" "gauplus" "geospy" "getjs" "gf" "gitdorker" "github-subdomains" "github-endpoints" "gittools" "gobuster" "goop" "gospider" "gowitness" "gxss" "hakcheckurl" "haklistgen" "hakrawler" "hakrevdns" "haktldextract" "haktrails" "httpie" "httprobe" "httpx" "jsscanner" "jsubfinder" "katana" "knock" "linkfinder" "mariadb-client" "meg" "metabigor" "mildew" "naabu" "netdiscover" "nikto" "nilo" "nmap" "notify" "nuclei" "oneforall" "paramspider" "photon" "prips" "puredns" "qsreplace" "quaithe" "rayder" "revwhoix" "sdlookup" "searchsploit" "secretfinder" "sherlock" "shuffledns" "spiderfoot" "sqlmap" "subfinder" "subjs" "sudomy" "sublist3r" "testssl" "theharvester" "trufflehog" "uncover" "unfurl" "uro" "wafw00f" "waybackurls" "wfuzz" "whoxyrm" "wpscan" "xurlfind3r" "assetnote-wordlists" "seclists" "resolvers")
+order=("ubuntu-update" "basic-tools" "snap-refresh" "go" "python3" "airixss" "amass" "anew" "archivefuzz" "arjun" "assetfinder" "cdncheck" "cent" "cf-check" "chaos" "dalfox" "dirsearch" "dnsdumpster" "dnsexpire" "dnsgen" "dnspy" "dnsvalidator" "dnsx" "exif" "exploitdb" "ffuf" "findomain" "freq" "gau" "gauplus" "geospy" "getjs" "gf" "gitdorker" "github-subdomains" "github-endpoints" "gittools" "gobuster" "goop" "gospider" "gowitness" "gxss" "hakcheckurl" "haklistgen" "hakrawler" "hakrevdns" "haktldextract" "haktrails" "httpie" "httprobe" "httpx" "jsscanner" "jsubfinder" "katana" "knock" "linkfinder" "mariadb-client" "meg" "metabigor" "mildew" "naabu" "netdiscover" "nikto" "nilo" "nmap" "notify" "nuclei" "oneforall" "paramspider" "photon" "prips" "puredns" "qsreplace" "quaithe" "rayder" "revwhoix" "sdlookup" "searchsploit" "secretfinder" "sherlock" "shuffledns" "spiderfoot" "sqlmap" "subfinder" "subjs" "sudomy" "sublist3r" "testssl" "theharvester" "trufflehog" "uncover" "unfurl" "uro" "wafw00f" "waybackurls" "whoxyrm" "wpscan" "xurlfind3r" "assetnote-wordlists" "seclists" "resolvers")
 
 # ============ FIM DA AREA EDITAVEL ============
 
@@ -246,7 +249,7 @@ banner() {
             '\033[0;32m | `_ ` _ \| | | |  _  // _ \/ __/ _ \| `_ \ \/ / |  ___/ \___ \'
             '\033[0;32m | | | | | | |_| | | \ \  __/ (_| (_) | | | \  /  | |     ____) |'
             '\033[0;32m |_| |_| |_|\__, |_|  \_\___|\___\___/|_| |_|\/   |_|    |_____/'
-            '\033[0;32m             __/ |                                       v1.0.2'
+            '\033[0;32m             __/ |                                       v1.0.3'
             '\033[0;32m            |___/                                    \033[0;33mby Andalik'
             ''
             ''
