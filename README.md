@@ -8,7 +8,7 @@
 </pre>
 
 
-## Dependências e Pacotes Terceiros Instalados
+### Dependências e Pacotes Terceiros Instalados
 Obtidos via repositório oficial no GitHub:<br>
 
  > ubuntu-update
@@ -113,10 +113,10 @@ Obtidos via repositório oficial no GitHub:<br>
  > seclists
  > resolvers
 
-## Atualização dos Pacotes Obtidos via GITHUB
+### Atualização dos Pacotes Obtidos via GITHUB
 Sempre que for necessário atualizar os pacotes já instalados, basta reexecutar o script de instalação.
 
-## PEP 668
+### PEP 668
 Em versões mais recentes do Python aderentes ao PEP 668, podem ocorrer erros no uso do pip:
 
 error: externally-managed-environment
@@ -132,4 +132,18 @@ vi ~/.config/pip/pip.conf
 
 [global]
 break-system-packages = true 
+```
+
+### Uso dos Templates da Comunidade Nuclei
+Após a instalação das ferramentas, baixe os templates da comunidade para o Nuclei no seu diretório de usuário:
+```
+cd ~
+cent init
+cent -p cent-nuclei-templates
+```
+
+Por fim, para rodar o Nuclei com os novos templates, faça:
+```
+nuclei -u https://example.com -t ./cent-nuclei-templates -tags cve
+nuclei -l urls.txt -t ./cent-nuclei-templates -tags cve
 ```
