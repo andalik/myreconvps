@@ -1,338 +1,324 @@
 #!/bin/bash
+# myReconVPS.sh - Script para automatizar a instalação de ferramentas
+# Renato Andalik
+
+# ULTIMA ATUALIZACAO: 05/04/2025
+
+# Definição de variáveis globais
 declare -A commands
 declare -a order
+declare -a failed_tools
+declare -A skipped_tools
 
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+
+LOG_FILE="$SCRIPT_DIR/install_log.txt"
+RESUME_FILE="$SCRIPT_DIR/.install_state"
+SCRIPT_VERSION="1.2025.002"
 SECONDS=0
-
-# INSTRUCOES
-# Adicione comandos para instalacao de ferramentas no formato:
-#  commands["toolname1"]="command1 | command2 | ..."
-#  order=("toolname1" "toolname2" ...)
-
-# Tratamento de variaveis e caracteres especiais
-#  Aspas duplas sao utilizadas para delimitar o comando completo, portanto,
-#  na sua construcao de comando, utilize APENAS aspas simples.
-#  Em variaveis, utilize o caractere de escape.
-#  Por exemplo, $LATEST_VERSION fica \$LATEST_VERSION
-
-# Variaveis disponiveis para uso nos comandos:
-#  CONFIG_FILE 
-#  | aponta para o arquivo de configuracao de sessao utilizado pelo shell
-#  | (.profile, .bashrc ou .zshrc) 
-
-# ULTIMA ATUALIZACAO: 14/08/2024
-# Remoção temporária do wfuzz do ciclo de instalação (erro: pyparsing (>=2.4*) ; python_version >= "3.5")
-
-# ========== INICIO DA AREA EDITAVEL ===========
-
-# Mandatorios
-commands["ubuntu-update"]="apt-get update && apt-get -y upgrade"
-
-commands["basic-tools"]="apt-get -y install snapd git curl wget unzip gzip ftp telnet tcpdump net-tools ca-certificates"
-
-commands["snap-refresh"]="snap refresh"
-
-commands["go"]="LATEST_VERSION=\`curl -s https://go.dev/dl/ | grep filename | grep download | grep 'go[0-9\.]\+\.linux-amd64\.tar\.gz' | head -n 1 | awk -F '/dl/' '{print \$2}' | awk -F '\"' '{print \$1}'\` && wget https://go.dev/dl/\$LATEST_VERSION && rm -rf /usr/local/go && tar -C /usr/local -xzf \$LATEST_VERSION && rm -f \$LATEST_VERSION && grep -q 'export PATH=\$PATH:/usr/local/go/bin' \$CONFIG_FILE || echo 'export PATH=\$PATH:/usr/local/go/bin' >> \$CONFIG_FILE && source \$CONFIG_FILE"
-
-commands["python3"]="apt-get -y install python3-pip"
-
-# Programas Variados
-commands["airixss"]="go install github.com/ferreiraklet/airixss@latest && mkdir /opt/airixss ; mv -f ~/go/bin/airixss /opt/airixss/ && grep -q 'export PATH=\$PATH:/opt/airixss' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/airixss' >> \$CONFIG_FILE"
-
-commands["amass"]="apt-get -y install g++-x86-64-linux-gnu libc6-dev-amd64-cross ; go install -v github.com/owasp-amass/amass/v4/...@master && mkdir /opt/amass ; mv -f ~/go/bin/amass /opt/amass/ && grep -q 'export PATH=\$PATH:/opt/amass' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/amass' >> \$CONFIG_FILE"
-
-commands["anew"]="go install github.com/tomnomnom/anew@latest && mkdir /opt/anew ; mv -f ~/go/bin/anew /opt/anew/ && grep -q 'export PATH=\$PATH:/opt/anew' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/anew' >> \$CONFIG_FILE"
-
-commands["archivefuzz"]="git clone https://github.com/devanshbatham/ArchiveFuzz && cd ArchiveFuzz && pip3 install -r requirements.txt && cd .. && cp -rf ArchiveFuzz/ /opt/archivefuzz && rm -rf ArchiveFuzz && grep -q 'export PATH=\$PATH:/opt/archivefuzz' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/archivefuzz' >> \$CONFIG_FILE"
-
-commands["arjun"]="pip3 install arjun"
-
-commands["assetfinder"]="go install github.com/tomnomnom/assetfinder@latest && mkdir /opt/assetfinder ; mv -f ~/go/bin/assetfinder /opt/assetfinder/ && grep -q 'export PATH=\$PATH:/opt/assetfinder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/assetfinder' >> \$CONFIG_FILE"
-
-commands["cdncheck"]="go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest && mkdir /opt/cdncheck ; mv -f ~/go/bin/cdncheck /opt/cdncheck/ && grep -q 'export PATH=\$PATH:/opt/cdncheck' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/cdncheck' >> \$CONFIG_FILE"
-
-commands["cent"]="go install -v github.com/xm1k3/cent@latest && mkdir /opt/cent ; mv -f ~/go/bin/cent /opt/cent/ && grep -q 'export PATH=\$PATH:/opt/cent' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/cent' >> \$CONFIG_FILE"
-
-commands["cf-check"]="go install github.com/dwisiswant0/cf-check@latest && mkdir /opt/cf-check ; mv -f ~/go/bin/cf-check /opt/cf-check/ && grep -q 'export PATH=\$PATH:/opt/cf-check' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/cf-check' >> \$CONFIG_FILE"
-
-commands["chaos"]="go install -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest && mkdir /opt/chaos ; mv -f ~/go/bin/chaos /opt/chaos/ && grep -q 'export PATH=\$PATH:/opt/chaos' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/chaos' >> \$CONFIG_FILE"
-
-commands["dalfox"]="go install github.com/hahwul/dalfox/v2@latest && mkdir /opt/dalfox ; mv -f ~/go/bin/dalfox /opt/dalfox/ && grep -q 'export PATH=\$PATH:/opt/dalfox' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dalfox' >> \$CONFIG_FILE"
-
-commands["dirsearch"]="git clone https://github.com/maurosoria/dirsearch.git --depth 1 && cd dirsearch && pip3 install -r requirements.txt && cd .. && cp -rf dirsearch/ /opt/ && rm -rf dirsearch && grep -q 'export PATH=\$PATH:/opt/dirsearch' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dirsearch' >> \$CONFIG_FILE"
-
-commands["dnsdumpster"]="git clone https://github.com/nmmapper/dnsdumpster.git && cd dnsdumpster && pip3 install -r requirements.txt && cd .. && cp -rf dnsdumpster/ /opt/ && rm -rf dnsdumpster && grep -q 'export PATH=\$PATH:/opt/dnsdumpster' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dnsdumpster' >> \$CONFIG_FILE"
-
-commands["dnsexpire"]="git clone https://github.com/gwen001/dnsexpire && cp -rf dnsexpire/ /opt/ && rm -rf dnsexpire && grep -q 'export PATH=\$PATH:/opt/dnsexpire' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dnsexpire' >> \$CONFIG_FILE"
-
-commands["dnsgen"]="python3 -m pip install dnsgen"
-
-commands["dnspy"]="git clone https://github.com/gwen001/dnspy && cd dnspy && pip3 install -r requirements.txt && cd .. && cp -rf dnspy/ /opt/ && rm -rf dnspy && grep -q 'export PATH=\$PATH:/opt/dnspy' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dnspy' >> \$CONFIG_FILE"
-
-commands["dnsvalidator"]="git clone https://github.com/vortexau/dnsvalidator.git && cd dnsvalidator && python3 setup.py install && cd .. && cp -rf dnsvalidator/ /opt/ && rm -rf dnsvalidator && grep -q 'export PATH=\$PATH:/opt/dnsvalidator' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dnsvalidator' >> \$CONFIG_FILE"
-
-commands["dnsx"]="go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest && mkdir /opt/dnsx ; mv -f ~/go/bin/dnsx /opt/dnsx/ && grep -q 'export PATH=\$PATH:/opt/dnsx' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dnsx' >> \$CONFIG_FILE"
-
-commands["exif"]="apt-get -y install libimage-exiftool-perl"
-
-commands["exploitdb"]="git clone https://gitlab.com/exploit-database/exploitdb.git && mkdir /opt/exploitdb ; cp -rf exploitdb/ /opt/ && rm -rf exploitdb && grep -q 'export PATH=\$PATH:/opt/exploitdb' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/exploitdb' >> \$CONFIG_FILE"
-
-commands["ffuf"]="git clone https://github.com/ffuf/ffuf && cd ffuf && go get && go build && cd .. && mkdir /opt/ffuf ; cp -rf ffuf/ /opt/ && rm -rf ffuf && grep -q 'export PATH=\$PATH:/opt/ffuf' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/ffuf' >> \$CONFIG_FILE"
-
-commands["findomain"]="curl -LO https://github.com/findomain/findomain/releases/latest/download/findomain-linux.zip && unzip findomain-linux.zip && chmod +x findomain && mkdir /opt/findomain ; mv -f findomain /opt/findomain/ && rm -f findomain-linux.zip && grep -q 'export PATH=\$PATH:/opt/findomain' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/findomain' >> \$CONFIG_FILE"
-
-commands["freq"]="go install github.com/takshal/freq@latest && mkdir /opt/freq ; mv -f ~/go/bin/freq /opt/freq/ && grep -q 'export PATH=\$PATH:/opt/freq' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/freq' >> \$CONFIG_FILE"
-
-commands["gau"]="go install github.com/lc/gau/v2/cmd/gau@latest && mkdir /opt/gau ; mv -f ~/go/bin/gau /opt/gau/ && grep -q 'export PATH=\$PATH:/opt/gau' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gau' >> \$CONFIG_FILE"
-
-commands["gauplus"]="go install github.com/bp0lr/gauplus@latest && mkdir /opt/gauplus ; mv -f ~/go/bin/gauplus /opt/gauplus/ && grep -q 'export PATH=\$PATH:/opt/gauplus' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gauplus' >> \$CONFIG_FILE"
-
-commands["geospy"]="pip3 install geospyer"
-
-commands["getjs"]="go install github.com/003random/getJS@latest && mkdir /opt/getjs ; mv -f ~/go/bin/getJS /opt/getjs/getjs && grep -q 'export PATH=\$PATH:/opt/getjs' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/getjs' >> \$CONFIG_FILE"
-
-commands["gf"]="go install github.com/tomnomnom/gf@latest && mkdir /opt/gf ; mv -f ~/go/bin/gf /opt/gf/ && grep -q 'export PATH=\$PATH:/opt/gf' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gf' >> \$CONFIG_FILE"
-
-commands["gitdorker"]="git clone https://github.com/obheda12/GitDorker.git && cd GitDorker && pip3 install -r requirements.txt && cd .. && cp -rf GitDorker/ /opt/gitdorker && rm -rf GitDorker && grep -q 'export PATH=\$PATH:/opt/gitdorker' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gitdorker' >> \$CONFIG_FILE"
-
-commands["github-search"]="git clone https://github.com/gwen001/github-search && cd github-search && pip3 install -r requirements.txt && cd .. && cp -rf github-search/ /opt/ && rm -rf github-search && grep -q 'export PATH=\$PATH:/opt/github-search' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/github-search' >> \$CONFIG_FILE"
-
-commands["github-subdomains"]="go install github.com/gwen001/github-subdomains@latest && mkdir /opt/github-subdomains ; mv -f ~/go/bin/github-subdomains /opt/github-subdomains/ && grep -q 'export PATH=\$PATH:/opt/github-subdomains' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/github-subdomains' >> \$CONFIG_FILE"
-
-commands["github-endpoints"]="go install github.com/gwen001/github-endpoints@latest && mkdir /opt/github-endpoints ; mv -f ~/go/bin/github-endpoints /opt/github-endpoints/ && grep -q 'export PATH=\$PATH:/opt/github-endpoints' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/github-endpoints' >> \$CONFIG_FILE"
-
-commands["gittools"]="git clone https://github.com/internetwache/GitTools.git && cd GitTools/Finder && pip3 install -r requirements.txt && cd ../.. && cp -rf GitTools/ /opt/gittools && rm -rf GitTools && grep -q 'export PATH=\$PATH:/opt/gittools' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gittools' >> \$CONFIG_FILE"
-
-commands["gobuster"]="go install github.com/OJ/gobuster/v3@latest && mkdir /opt/gobuster ; mv -f ~/go/bin/gobuster /opt/gobuster/ && grep -q 'export PATH=\$PATH:/opt/gobuster' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gobuster' >> \$CONFIG_FILE"
-
-commands["goop"]="go install github.com/deletescape/goop@latest && mkdir /opt/goop ; mv -f ~/go/bin/goop /opt/goop/ && grep -q 'export PATH=\$PATH:/opt/goop' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/goop' >> \$CONFIG_FILE"
-
-commands["gospider"]="GO111MODULE=on go install github.com/jaeles-project/gospider@latest && mkdir /opt/gospider ; mv -f ~/go/bin/gospider /opt/gospider && grep -q 'export PATH=\$PATH:/opt/gospider' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gospider' >> \$CONFIG_FILE"
-
-commands["gowitness"]="go install github.com/sensepost/gowitness@latest && mkdir /opt/gowitness ; mv -f ~/go/bin/gowitness /opt/gowitness/ && grep -q 'export PATH=\$PATH:/opt/gowitness' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gowitness' >> \$CONFIG_FILE"
-
-commands["gxss"]="go install github.com/KathanP19/Gxss@latest && mkdir /opt/gxss ; mv -f ~/go/bin/Gxss /opt/gxss/gxss && grep -q 'export PATH=\$PATH:/opt/gxss' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gxss' >> \$CONFIG_FILE"
-
-commands["hakcheckurl"]="go install github.com/hakluke/hakcheckurl@latest && mkdir /opt/hakcheckurl ; mv -f ~/go/bin/hakcheckurl /opt/hakcheckurl/ && grep -q 'export PATH=\$PATH:/opt/hakcheckurl' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/hakcheckurl' >> \$CONFIG_FILE"
-
-commands["haklistgen"]="go install github.com/hakluke/haklistgen@latest && mkdir /opt/haklistgen ; mv -f ~/go/bin/haklistgen /opt/haklistgen/ && grep -q 'export PATH=\$PATH:/opt/haklistgen' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/haklistgen' >> \$CONFIG_FILE"
-
-commands["hakrawler"]="go install github.com/hakluke/hakrawler@latest && mkdir /opt/hakrawler ; mv -f ~/go/bin/hakrawler /opt/hakrawler/ && grep -q 'export PATH=\$PATH:/opt/hakrawler' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/hakrawler' >> \$CONFIG_FILE"
-
-commands["hakrevdns"]="go install github.com/hakluke/hakrevdns@latest && mkdir /opt/hakrevdns ; mv -f ~/go/bin/hakrevdns /opt/hakrevdns/ && grep -q 'export PATH=\$PATH:/opt/hakrevdns' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/hakrevdns' >> \$CONFIG_FILE"
-
-commands["haktldextract"]="go install github.com/hakluke/haktldextract@latest && mkdir /opt/haktldextract ; mv -f ~/go/bin/haktldextract /opt/haktldextract/ && grep -q 'export PATH=\$PATH:/opt/haktldextract' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/haktldextract' >> \$CONFIG_FILE"
-
-commands["haktrails"]="go install -v github.com/hakluke/haktrails@latest && mkdir /opt/haktrails ; mv -f ~/go/bin/haktrails /opt/haktrails/ && grep -q 'export PATH=\$PATH:/opt/haktrails' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/haktrails' >> \$CONFIG_FILE"
-
-commands["httpie"]="snap install httpie"
-
-commands["httprobe"]="go install github.com/tomnomnom/httprobe@latest && mkdir /opt/httprobe ; mv -f ~/go/bin/httprobe /opt/httprobe/ && grep -q 'export PATH=\$PATH:/opt/httprobe' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/httprobe' >> \$CONFIG_FILE"
-
-commands["httpx"]="go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && mkdir /opt/httpx ; mv -f ~/go/bin/httpx /opt/httpx/ && grep -q 'export PATH=\$PATH:/opt/httpx' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/httpx' >> \$CONFIG_FILE"
-
-commands["jsscanner"]="git clone https://github.com/0x240x23elu/JSScanner.git && cd JSScanner && pip3 install -r requirements.txt && cd .. && cp -rf JSScanner/ /opt/jsscanner && rm -rf JSScanner && grep -q 'export PATH=\$PATH:/opt/jsscanner' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/jsscanner' >> \$CONFIG_FILE"
-
-commands["jsubfinder"]="go install github.com/ThreatUnkown/jsubfinder@latest && wget https://raw.githubusercontent.com/ThreatUnkown/jsubfinder/master/.jsf_signatures.yaml && mkdir /opt/jsubfinder ; mv -f ~/go/bin/jsubfinder /opt/jsubfinder/ && mv -f .jsf_signatures.yaml /opt/jsubfinder/ && grep -q 'export PATH=\$PATH:/opt/jsubfinder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/jsubfinder' >> \$CONFIG_FILE"
-
-commands["katana"]="go install github.com/projectdiscovery/katana/cmd/katana@latest && mkdir /opt/katana ; mv -f ~/go/bin/katana /opt/katana/ && grep -q 'export PATH=\$PATH:/opt/katana' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/katana' >> \$CONFIG_FILE"
-
-commands["knock"]="git clone https://github.com/guelfoweb/knock.git && cd knock && pip3 install -r requirements.txt && cd .. && cp -rf knock/ /opt/ && rm -rf knock && grep -q 'export PATH=\$PATH:/opt/knock' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/knock' >> \$CONFIG_FILE"
-
-commands["linkfinder"]="git clone https://github.com/GerbenJavado/LinkFinder.git && cd LinkFinder && python3 setup.py install && pip3 install -r requirements.txt && cd .. && cp -rf LinkFinder/ /opt/linkfinder && rm -rf LinkFinder && grep -q 'export PATH=\$PATH:/opt/linkfinder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/linkfinder' >> \$CONFIG_FILE"
-
-commands["mariadb-client"]="apt-get -y install mariadb-client"
-
-commands["meg"]="go install github.com/tomnomnom/meg@latest && mkdir /opt/meg ; mv -f ~/go/bin/meg /opt/meg/ && grep -q 'export PATH=\$PATH:/opt/meg' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/meg' >> \$CONFIG_FILE"
-
-commands["metabigor"]="git clone https://github.com/j3ssie/metabigor.git && cd metabigor && go install && cd .. && rm -rf metabigor && mkdir /opt/metabigor ; mv -f ~/go/bin/metabigor /opt/metabigor/ && grep -q 'export PATH=\$PATH:/opt/metabigor' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/metabigor' >> \$CONFIG_FILE"
-
-commands["mildew"]="go install github.com/daehee/mildew/cmd/mildew@latest && mkdir /opt/mildew ; mv -f ~/go/bin/mildew /opt/mildew/ && grep -q 'export PATH=\$PATH:/opt/mildew' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/mildew' >> \$CONFIG_FILE"
-
-commands["naabu"]="apt-get -y install libpcap-dev ; go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && mkdir /opt/naabu ; mv -f ~/go/bin/naabu /opt/naabu/ && grep -q 'export PATH=\$PATH:/opt/naabu' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/naabu' >> \$CONFIG_FILE"
-
-commands["netdiscover"]="apt-get -y install netdiscover"
-
-commands["nikto"]="git clone https://github.com/sullo/nikto.git && cp -rf nikto/ /opt/ && rm -rf nikto && grep -q 'export PATH=\$PATH:/opt/nikto' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/nikto' >> \$CONFIG_FILE"
-
-commands["nilo"]="go install github.com/ferreiraklet/nilo@latest && mkdir /opt/nilo ; mv -f ~/go/bin/nilo /opt/nilo/ && grep -q 'export PATH=\$PATH:/opt/nilo' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/nilo' >> \$CONFIG_FILE"
-
-commands["nmap"]="apt-get -y install build-essential libssl-dev automake libffi-dev libncurses5-dev zlib1g zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev liblua5.3-dev libbpfcc-dev libpcap-dev libcfg-dev libssh2-1-dev libpcre3-dev libcairo2-dev pkg-config python3-dev python3-venv make gcc && pip3 install build && git clone https://github.com/nmap/nmap.git && cd nmap && make uninstall ; rm -f /usr/local/bin/zenmap ; rm -f /usr/local/share/zenmap ; python_dir=\$(ls /usr/local/lib | grep 'python' | sort -r | head -n 1) ; sudo rm -rf /usr/local/lib/\$python_dir/dist-packages/zenmap* ; ./configure && make && make install && cd .. && rm -rf nmap"
-
-commands["notify"]="go install -v github.com/projectdiscovery/notify/cmd/notify@latest && mkdir /opt/notify ; mv -f ~/go/bin/notify /opt/notify/ && grep -q 'export PATH=\$PATH:/opt/notify' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/notify' >> \$CONFIG_FILE"
-
-commands["nuclei"]="go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest && mkdir /opt/nuclei ; mv -f ~/go/bin/nuclei /opt/nuclei/ && grep -q 'export PATH=\$PATH:/opt/nuclei' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/nuclei' >> \$CONFIG_FILE"
-
-commands["oneforall"]="git clone https://github.com/shmilylty/OneForAll.git && cd OneForAll && python3 -m pip install -U pip setuptools wheel && pip3 install -r requirements.txt && cd .. && mkdir /opt/oneforall ; cp -rf OneForAll/* /opt/oneforall/ && rm -rf OneForAll && grep -q 'export PATH=\$PATH:/opt/oneforall/oneforall' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/oneforall/oneforall' >> \$CONFIG_FILE"
-
-commands["paramspider"]="git clone https://github.com/devanshbatham/paramspider && cd paramspider && pip3 install . && cd .. && cp -rf paramspider/ /opt/ && rm -rf paramspider && grep -q 'export PATH=\$PATH:/opt/paramspider' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/paramspider' >> \$CONFIG_FILE"
-
-commands["photon"]="git clone https://github.com/s0md3v/Photon.git && cd Photon && pip3 install -r requirements.txt && cd .. && mkdir /opt/photon ; cp -rf Photon/* /opt/photon/ && rm -rf Photon && grep -q 'export PATH=\$PATH:/opt/photon' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/photon' >> \$CONFIG_FILE"
-
-commands["prips"]="apt-get -y install prips"
-
-commands["puredns"]="git clone https://github.com/blechschmidt/massdns.git && cd massdns && make && make install && cd .. && rm -rf massdns && go install github.com/d3mondev/puredns/v2@latest && mkdir /opt/puredns ; mv -f ~/go/bin/puredns /opt/puredns/ && grep -q 'export PATH=\$PATH:/opt/puredns' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/puredns' >> \$CONFIG_FILE"
-
-commands["qsreplace"]="go install github.com/tomnomnom/qsreplace@latest && mkdir /opt/qsreplace ; mv -f ~/go/bin/qsreplace /opt/qsreplace/ && grep -q 'export PATH=\$PATH:/opt/qsreplace' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/qsreplace' >> \$CONFIG_FILE"
-
-commands["quaithe"]="pip3 install alive_progress && git clone https://github.com/devanshbatham/Quaithe && cd Quaithe && chmod +x setup.sh && ./setup.sh && cd .. && mkdir /opt/quaithe ; cp -rf Quaithe/* /opt/quaithe/ && rm -rf Quaithe && grep -q 'export PATH=\$PATH:/opt/quaithe' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/quaithe' >> \$CONFIG_FILE"
-
-commands["rayder"]="go install github.com/devanshbatham/rayder@latest && mkdir /opt/rayder ; mv -f ~/go/bin/rayder /opt/rayder/ && grep -q 'export PATH=\$PATH:/opt/rayder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/rayder' >> \$CONFIG_FILE"
-
-commands["revwhoix"]="git clone https://github.com/Sybil-Scan/revwhoix && cd revwhoix && pip3 install . && cd .. && cp -rf revwhoix/ /opt/ && rm -rf revwhoix && grep -q 'export PATH=\$PATH:/opt/revwhoix' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/revwhoix' >> \$CONFIG_FILE"
-
-commands["sdlookup"]="go install github.com/j3ssie/sdlookup@latest && mkdir /opt/sdlookup ; mv -f ~/go/bin/sdlookup /opt/sdlookup/ && grep -q 'export PATH=\$PATH:/opt/sdlookup' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/sdlookup' >> \$CONFIG_FILE"
-
-commands["searchsploit"]="apt-get update && apt-get -y install snapd && snap install searchsploit"
-
-commands["secretfinder"]="git clone https://github.com/m4ll0k/SecretFinder.git secretfinder && cd secretfinder && pip3 install -r requirements.txt && cd .. && cp -rf secretfinder/ /opt/ && rm -rf secretfinder && grep -q 'export PATH=\$PATH:/opt/secretfinder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/secretfinder' >> \$CONFIG_FILE"
-
-commands["sherlock"]="pip3 install sherlock-project"
-
-commands["shuffledns"]="go install -v github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest && mkdir /opt/shuffledns ; mv -f ~/go/bin/shuffledns /opt/shuffledns/ && grep -q 'export PATH=\$PATH:/opt/shuffledns' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/shuffledns' >> \$CONFIG_FILE"
-
-commands["spiderfoot"]="git clone https://github.com/smicallef/spiderfoot.git && cd spiderfoot && pip3 install -r requirements.txt && cd .. && cp -rf spiderfoot/ /opt/ && rm -rf spiderfoot && grep -q 'export PATH=\$PATH:/opt/spiderfoot' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/spiderfoot' >> \$CONFIG_FILE"
-
-commands["sqlmap"]="git clone https://github.com/sqlmapproject/sqlmap.git --depth 1 && cp -rf sqlmap/ /opt/ && rm -rf sqlmap && grep -q 'export PATH=\$PATH:/opt/sqlmap' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/sqlmap' >> \$CONFIG_FILE"
-
-commands["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && mkdir /opt/subfinder ; mv -f ~/go/bin/subfinder /opt/subfinder/ && grep -q 'export PATH=\$PATH:/opt/subfinder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/subfinder' >> \$CONFIG_FILE"
-
-commands["subjs"]="go install -v github.com/lc/subjs@latest && mkdir /opt/subjs ; mv -f ~/go/bin/subjs /opt/subjs/ && grep -q 'export PATH=\$PATH:/opt/subjs' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/subjs' >> \$CONFIG_FILE"
-
-commands["sudomy"]="apt-get -y install jq nmap phantomjs npm chromium parallel ; npm i -g wappalyzer wscat ; git clone --recursive https://github.com/screetsec/Sudomy.git && cd Sudomy && pip3 install -r requirements.txt && cd .. && mkdir /opt/sudomy ; cp -rf Sudomy/* /opt/sudomy/ && rm -rf Sudomy && grep -q 'export PATH=\$PATH:/opt/sudomy' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/sudomy' >> \$CONFIG_FILE"
-
-commands["sublist3r"]="git clone https://github.com/aboul3la/Sublist3r.git && cd Sublist3r && pip3 install -r requirements.txt && cd .. && mkdir /opt/sublist3r ; cp -rf Sublist3r/* /opt/sublist3r/ && rm -rf Sublist3r && grep -q 'export PATH=\$PATH:/opt/Sublist3r' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/Sublist3r' >> \$CONFIG_FILE"
-
-commands["testssl"]="snap install testssl"
-
-commands["theharvester"]="git clone https://github.com/laramies/theHarvester && cd theHarvester && python3 -m pip install -r requirements/base.txt && cd .. && mkdir /opt/theharvester ; cp -rf theHarvester/* /opt/theharvester/ && rm -rf theHarvester && grep -q 'export PATH=\$PATH:/opt/theharvester' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/theharvester' >> \$CONFIG_FILE"
-
-commands["trufflehog"]="git clone https://github.com/trufflesecurity/trufflehog.git && cd trufflehog && go install && cd .. && rm -rf trufflehog && mkdir /opt/trufflehog ; mv -f ~/go/bin/trufflehog /opt/trufflehog/ && grep -q 'export PATH=\$PATH:/opt/trufflehog' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/trufflehog' >> \$CONFIG_FILE"
-
-commands["uncover"]="go install -v github.com/projectdiscovery/uncover/cmd/uncover@latest && mkdir /opt/uncover ; mv -f ~/go/bin/uncover /opt/uncover/ && grep -q 'export PATH=\$PATH:/opt/uncover' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/uncover' >> \$CONFIG_FILE"
-
-commands["unfurl"]="go install github.com/tomnomnom/unfurl@latest && mkdir /opt/unfurl ; mv -f ~/go/bin/unfurl /opt/unfurl/ && grep -q 'export PATH=\$PATH:/opt/unfurl' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/unfurl' >> \$CONFIG_FILE"
-
-commands["uro"]="pip3 install uro"
-
-commands["wafw00f"]="git clone https://github.com/EnableSecurity/wafw00f.git && cd wafw00f && python3 setup.py install && cd .. && cp -rf wafw00f/ /opt/ && rm -rf wafw00f && grep -q 'export PATH=\$PATH:/opt/wafw00f/bin' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/wafw00f/bin' >> \$CONFIG_FILE"
-
-commands["waybackurls"]="go install github.com/tomnomnom/waybackurls@latest && mkdir /opt/waybackurls ; mv -f ~/go/bin/waybackurls /opt/waybackurls/ && grep -q 'export PATH=\$PATH:/opt/waybackurls' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/waybackurls' >> \$CONFIG_FILE"
-
-commands["wfuzz"]="pip3 install wfuzz"
-
-commands["whoxyrm"]="go install github.com/milindpurswani/whoxyrm@latest && mkdir /opt/whoxyrm ; mv -f ~/go/bin/whoxyrm /opt/whoxyrm/ && grep -q 'export PATH=\$PATH:/opt/whoxyrm' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/whoxyrm' >> \$CONFIG_FILE"
-
-commands["wpscan"]="apt-get update && apt-get -y install ruby && apt-get -y install build-essential libcurl4-openssl-dev libxml2 libxml2-dev libxslt1-dev ruby-dev libgmp-dev zlib1g-dev && gem install wpscan"
-
-commands["xurlfind3r"]="go install -v github.com/hueristiq/xurlfind3r/cmd/xurlfind3r@latest && mkdir /opt/xurlfind3r ; mv -f ~/go/bin/xurlfind3r /opt/xurlfind3r/ && grep -q 'export PATH=\$PATH:/opt/xurlfind3r' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/xurlfind3r' >> \$CONFIG_FILE"
-
-# Dicionarios e Similiares
-commands["assetnote-wordlists"]="wget -r --no-parent -R 'index.html*' -e robots=off https://wordlists-cdn.assetnote.io/data/ -nH && mkdir -p /opt/wordlists/assetnote ; cp -rf data/* /opt/wordlists/assetnote/ && rm -rf data"
-
-commands["seclists"]="git clone https://github.com/danielmiessler/SecLists.git && mkdir -p /opt/wordlists/seclists ; cp -rf SecLists/* /opt/wordlists/seclists/ && rm -rf SecLists"
-
-commands["resolvers"]="wget https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt && wget https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt && mv -f resolvers*.txt /opt/"
-
-
-# Selecao e Ordem de Instalacao
-order=("ubuntu-update" "basic-tools" "snap-refresh" "go" "python3" "airixss" "amass" "anew" "archivefuzz" "arjun" "assetfinder" "cdncheck" "cent" "cf-check" "chaos" "dalfox" "dirsearch" "dnsdumpster" "dnsexpire" "dnsgen" "dnspy" "dnsvalidator" "dnsx" "exif" "exploitdb" "ffuf" "findomain" "freq" "gau" "gauplus" "geospy" "getjs" "gf" "gitdorker" "github-subdomains" "github-endpoints" "gittools" "gobuster" "goop" "gospider" "gowitness" "gxss" "hakcheckurl" "haklistgen" "hakrawler" "hakrevdns" "haktldextract" "haktrails" "httpie" "httprobe" "httpx" "jsscanner" "jsubfinder" "katana" "knock" "linkfinder" "mariadb-client" "meg" "metabigor" "mildew" "naabu" "netdiscover" "nikto" "nilo" "nmap" "notify" "nuclei" "oneforall" "paramspider" "photon" "prips" "puredns" "qsreplace" "quaithe" "rayder" "revwhoix" "sdlookup" "searchsploit" "secretfinder" "sherlock" "shuffledns" "spiderfoot" "sqlmap" "subfinder" "subjs" "sudomy" "sublist3r" "testssl" "theharvester" "trufflehog" "uncover" "unfurl" "uro" "wafw00f" "waybackurls" "whoxyrm" "wpscan" "xurlfind3r" "assetnote-wordlists" "seclists" "resolvers")
-
-# ============ FIM DA AREA EDITAVEL ============
-
+RESUME_INSTALL=false
+INSTALLATION_STARTED=false
+
+# Cores para saída no terminal
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[0;33m"
+BLUE="\033[0;34m"
+PURPLE="\033[0;35m"
+CYAN="\033[0;36m"
+NC="\033[0m" # No Color
+
+# banner()
+# Função para exibir o banner
 banner() {
-    text=(
-            ''
-            '\033[0;32m                  _____                  __      _______   _____'
-            '\033[0;32m                 |  __ \                 \ \    / /  __ \ / ____|'
-            '\033[0;32m  _ __ ___  _   _| |__) |___  ___ ___  _ _\ \  / /| |__) | (___'
-            '\033[0;32m | `_ ` _ \| | | |  _  // _ \/ __/ _ \| `_ \ \/ / |  ___/ \___ \'
-            '\033[0;32m | | | | | | |_| | | \ \  __/ (_| (_) | | | \  /  | |     ____) |'
-            '\033[0;32m |_| |_| |_|\__, |_|  \_\___|\___\___/|_| |_|\/   |_|    |_____/'
-            '\033[0;32m             __/ |                                       v1.0.3'
-            '\033[0;32m            |___/                                    \033[0;33mby Andalik'
-            ''
-            ''
-            '\033[0mProgresso: |#                                                  | 0%'
-    )
-
     clear
-    for line in "${text[@]}"; do
-        echo -e "$line"
-    done
-    sleep 3
 
-    for i in {1..11}; do
-        # Remove a primeira linha do texto
-        text=("${text[@]:1}")
-        clear
-        for line in "${text[@]}"; do
-            echo -e "$line"
-        done
-        sleep 0.15
-    done
+    echo -e "${GREEN}"
+    echo -e '                  _____                  __      _______   _____'
+    echo -e '                 |  __ \                 \ \    / /  __ \ / ____|'
+    echo -e '  _ __ ___  _   _| |__) |___  ___ ___  _ _\ \  / /| |__) | (___'
+    echo -e ' | `_ ` _ \| | | |  _  // _ \/ __/ _ \| `_ \ \/ / |  ___/ \___ \'
+    echo -e ' | | | | | | |_| | | \ \  __/ (_| (_) | | | \  /  | |     ____) |'
+    echo -e ' |_| |_| |_|\__, |_|  \_\___|\___\___/|_| |_|\/   |_|    |_____/'
+    echo -e '             __/ |                                    by Andalik'
+    echo -e '            |___/'
+    echo -e "  ${YELLOW}v${SCRIPT_VERSION}${NC}\n"
+
+    echo -e "${CYAN}Sistema:${NC} $(uname -a)"
+    echo -e "${CYAN}Log:${NC} $LOG_FILE\n"
 }
 
+# log()
+# Função para registrar mensagens de log
+log() {
+    local level=$1
+    local message=$2
+    local silent=$3
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    
+    if [ -z "$silent" ]; then
+        echo "[$timestamp] [$level] $message" | tee -a "$LOG_FILE"
+    else
+        echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+    fi
+}
+
+# check_result()
+# Função para verificar se o comando foi executado com sucesso
+check_result() {
+    local tool=$1
+    local exit_code=$2
+    local output=$3
+    
+    if [ $exit_code -ne 0 ]; then
+        log "ERRO" "Falha ao instalar $tool: $output"
+        failed_tools+=("$tool")
+        return 1
+    else
+        log "INFO" "$tool instalado com sucesso"
+        return 0
+    fi
+}
+
+# check_os()
+# Função para verificar compatibilidade com o sistema operacional
 check_os() {
     if [[ -e /etc/debian_version ]]; then
         OS="debian"
         source /etc/os-release
 
-        if [[ $ID == "debian" || $ID == "raspbian" ]]; then
+        if [[ $ID == "kali" ]]; then
+            OS="kali"
+            log "INFO" "Kali Linux detectado: $VERSION_ID" "no_console_output"
+            echo -e "${GREEN}[INFO]${NC} Kali Linux $VERSION_ID detectado"
+            
+        elif [[ $ID == "debian" || $ID == "raspbian" ]]; then
             if [[ $VERSION_ID -lt 9 ]]; then
-                echo "~Z| ~O Your version of Debian is not supported."
-                echo ""
-                echo "However, if you're using Debian >= 9 or unstable/testing then you can continue, at your own risk."
-                echo ""
-                until [[ $CONTINUE =~ (y|n) ]]; do
-                    read -rp "Continue? [y/n]: " -e CONTINUE
+                log "AVISO" "Versão do Debian não suportada: $VERSION_ID (recomendado >= 9)" "no_console_output"
+                echo -e "${YELLOW}[AVISO]${NC} Sua versão do Debian $VERSION_ID não é oficialmente suportada."
+                echo -e "${YELLOW}[AVISO]${NC} Recomendado: Debian 9 ou superior."
+                echo -e "${YELLOW}[AVISO]${NC} Continuar mesmo assim? (por sua conta e risco)"
+                until [[ $CONTINUE =~ (s|n) ]]; do
+                    read -rp "Continuar? [s/n]: " -e CONTINUE
                 done
                 if [[ $CONTINUE == "n" ]]; then
+                    log "INFO" "Instalação abortada pelo usuário devido a versão do sistema não suportada"
                     exit 1
                 fi
             fi
         elif [[ $ID == "ubuntu" ]]; then
             OS="ubuntu"
             MAJOR_UBUNTU_VERSION=$(echo "$VERSION_ID" | cut -d '.' -f1)
-            if [[ $MAJOR_UBUNTU_VERSION -lt 20 ]]; then
-                echo "~Z| ~O Your version of Ubuntu is not supported."
-                echo ""
-                echo "However, if you're using Ubuntu >= 20.04 or unstable/testing then you can continue, at your own risk."
-                echo ""
-                until [[ $CONTINUE =~ (y|n) ]]; do
-                    read -rp "Continue? [y/n]: " -e CONTINUE
+            if [[ $MAJOR_UBUNTU_VERSION -lt 22 ]]; then
+                log "AVISO" "Versão do Ubuntu não suportada: $VERSION_ID (recomendado >= 22.04)" "no_console_output"
+                echo -e "${YELLOW}[AVISO]${NC} Sua versão do Ubuntu $VERSION_ID não é oficialmente suportada."
+                echo -e "${YELLOW}[AVISO]${NC} Recomendado: Ubuntu 22.04 ou superior."
+                echo -e "${YELLOW}[AVISO]${NC} Continuar mesmo assim? (por sua conta e risco)"
+                until [[ $CONTINUE =~ (s|n) ]]; do
+                    read -rp "Continuar? [s/n]: " -e CONTINUE
                 done
                 if [[ $CONTINUE == "n" ]]; then
+                    log "INFO" "Instalação abortada pelo usuário devido a versão do sistema não suportada"
                     exit 1
                 fi
             fi
-	fi
+        else
+            log "AVISO" "Distribuição Linux $ID não testada. Baseado em Debian, tentando prosseguir." "no_console_output"
+            echo -e "${YELLOW}[AVISO]${NC} Distribuição Linux $ID não foi testada oficialmente."
+            echo -e "${YELLOW}[AVISO]${NC} Baseada em Debian, tentando prosseguir."
+            echo -e "${YELLOW}[AVISO]${NC} Continuar mesmo assim? (por sua conta e risco)"
+            until [[ $CONTINUE =~ (s|n) ]]; do
+                read -rp "Continuar? [s/n]: " -e CONTINUE
+            done
+            if [[ $CONTINUE == "n" ]]; then
+                log "INFO" "Instalação abortada pelo usuário devido a distribuição não suportada"
+                exit 1
+            fi
+        fi
+        log "INFO" "Sistema operacional compatível: $ID $VERSION_ID" "no_console_output"
     else
-        echo "~_~[~Q Looks like you aren't running this installer on a Debian or Ubuntu Linux system."
+        log "ERRO" "Sistema operacional não suportado. Este script é para distribuições baseadas em Debian." "no_console_output"
+        echo -e "${RED}[ERRO]${NC} Sistema operacional não suportado."
+        echo -e "${YELLOW}[INFO]${NC} Este script foi projetado para distribuições baseadas em Debian como:"
+        echo -e "${YELLOW}[INFO]${NC} - Debian"
+        echo -e "${YELLOW}[INFO]${NC} - Ubuntu"
+        echo -e "${YELLOW}[INFO]${NC} - Kali Linux"
+        echo -e "${YELLOW}[INFO]${NC} - Raspbian"
         exit 1
     fi
 }
 
-colored_echo() {
-    case $1 in
-        "red")
-            echo -e "\e[31m$2\e[0m"
-            ;;
-        "green")
-            echo -e "\e[32m$2\e[0m"
-            ;;
-        "yellow")
-            echo -e "\e[33m$2\e[0m"
-            ;;
-        "blue")
-            echo -e "\e[34m$2\e[0m"
-            ;;
-    esac
+# check_disk_space()
+# Função para verificar espaço em disco
+check_disk_space() {
+    # min_space é definido no arquivo myReconVPS.tools
+    local available=$(df -BG / | awk '{print $4}' | tail -1 | tr -d 'G')
+    
+    if [ "$available" -lt "$min_space" ]; then
+        log "AVISO" "Espaço em disco insuficiente: $available GB. Mínimo recomendado: $min_space GB" "no_console_output"
+        echo -e "${YELLOW}[AVISO]${NC} Espaço em disco disponível: $available GB"
+        echo -e "${YELLOW}[AVISO]${NC} Espaço mínimo recomendado: $min_space GB"
+        echo -n -e "\n${YELLOW}[AVISO]${NC} Deseja continuar mesmo assim? (s/n): "
+        read -r choice
+        if [[ "$choice" != "s" && "$choice" != "S" ]]; then
+            log "INFO" "Instalação abortada pelo usuário devido a espaço em disco insuficiente"
+            exit 1
+        fi
+    fi
 }
 
+# check_dependencies()
+# Função para verificar dependencias
+check_dependencies() {
+    local deps=("curl" "wget" "git")
+    local missing_deps=()
+
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" &> /dev/null; then
+            missing_deps+=("$dep")
+        fi
+    done
+
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        log "AVISO" "Dependencias faltantes: ${missing_deps[*]}" "no_console_output"
+        echo -e "${YELLOW}[AVISO]${NC} As seguintes dependencias estão faltando: ${missing_deps[*]}"
+        echo -e "${YELLOW}[AVISO]${NC} Instalando dependencias..."
+        apt-get update > /dev/null 2>&1
+        for dep in "${missing_deps[@]}"; do
+            apt-get install -y "$dep" > /dev/null 2>&1
+            if [ $? -ne 0 ]; then
+                log "ERRO" "Falha ao instalar dependencia: $dep" "no_console_output"
+                echo -e "${RED}[ERRO]${NC} Falha ao instalar dependencia: $dep"
+                exit 1
+            fi
+        done
+        echo -e "${GREEN}[OK]${NC} Dependencias instaladas com sucesso"
+    fi
+}
+
+# save_state()
+# Função para salvar o estado atual da instalação
+save_state() {
+    local progress=$1
+    local tools_done="${@:2}"
+    
+    # Salvar todas as ferramentas selecionadas (ordem atual de instalação)
+    # Envolver em aspas para evitar problemas com espaços e caracteres especiais
+    local selected_tools=("${order[@]}")
+    
+    echo "PROGRESS=$progress" > "$RESUME_FILE"
+    # Usar arrays para evitar que nomes de ferramentas sejam interpretados como comandos
+    echo "TOOLS_DONE=(${tools_done// /' '})" >> "$RESUME_FILE"
+    echo "SELECTED_TOOLS=(${selected_tools[@]})" >> "$RESUME_FILE"
+    echo "TIMESTAMP=$(date +%s)" >> "$RESUME_FILE"
+    
+    log "INFO" "Estado da instalação salvo (progresso: $progress, selecionadas: ${#order[@]})"
+}
+
+# load_state()
+# Função para carregar o estado anterior da instalação
+load_state() {
+    if [ -f "$RESUME_FILE" ]; then
+        # Usar o . (ponto) em vez de source para carregar o arquivo, é mais seguro
+        . "$RESUME_FILE"
+        
+        # Verificar se todas as variáveis necessárias existem e são arrays
+        if [ -n "$PROGRESS" ] && [ ${#TOOLS_DONE[@]} -ge 0 ] && [ -n "$TIMESTAMP" ] && [ ${#SELECTED_TOOLS[@]} -gt 0 ]; then
+            local current_time=$(date +%s)
+            local elapsed=$((current_time - TIMESTAMP))
+            local elapsed_formatted=$(printf "%02d:%02d:%02d" $((elapsed/3600)) $(( (elapsed%3600)/60 )) $((elapsed%60)))
+            
+            # Ferramentas pendentes (usando slicing de array)
+            local pending_tools=("${SELECTED_TOOLS[@]:$PROGRESS}")
+            
+            echo -e "${YELLOW}[AVISO]${NC} Encontrada instalação incompleta iniciada há $elapsed_formatted"
+            echo -e "${YELLOW}[AVISO]${NC} Progresso: $PROGRESS de ${#SELECTED_TOOLS[@]} ferramentas"
+            echo -e "${YELLOW}[AVISO]${NC} Ferramentas já instaladas: ${TOOLS_DONE[*]}"
+            echo -e "${YELLOW}[AVISO]${NC} Ferramentas pendentes: ${pending_tools[*]}"
+            echo -n -e "\n${YELLOW}[AVISO]${NC} Deseja continuar de onde parou? (s/n): "
+            read -r choice
+            if [[ "$choice" == "s" || "$choice" == "S" ]]; then
+                # Restaurar a seleção de ferramentas original
+                order=("${SELECTED_TOOLS[@]}")
+                log "INFO" "Continuando instalação a partir do progresso: $PROGRESS com ${#order[@]} ferramentas selecionadas"
+                # Flag para pular a seleção de ferramentas
+                RESUME_INSTALL=true
+                return 0
+            fi
+        else
+            log "AVISO" "Arquivo de estado encontrado mas inválido ou incompleto. Iniciando nova instalação."
+            rm -f "$RESUME_FILE"
+        fi
+    fi
+    log "INFO" "Iniciando nova instalação"
+    return 1
+}
+
+# select_tools()
+# Função para exibir menu de seleção de ferramentas
+select_tools() {
+    # Se estamos retomando uma instalação, não precisamos selecionar ferramentas novamente
+    if [ "$INSTALL_ALL" == "true" ] || [ "$RESUME_INSTALL" == "true" ]; then
+        return
+    fi
+    
+    echo -e "\n${CYAN}=== Selecione as ferramentas para instalação ===${NC}"
+    echo -e "${CYAN}0. ${NC}Instalar e/ou atualizar todas as ferramentas"
+    
+    local i=1
+    for tool in "${order[@]}"; do
+        echo -e "${CYAN}$i. ${NC}$tool"
+        i=$((i+1))
+    done
+    
+    echo -e "\n${YELLOW}Digite os números das ferramentas separados por espaço (ex: 1 3 5)${NC}"
+    echo -n -e "${YELLOW}ou digite '0' para instalar todas:${NC} "
+    read -r choices
+    
+    if [[ "$choices" == "0" ]]; then
+        return
+    fi
+    
+    # Criar uma cópia da ordem original
+    local original_order=("${order[@]}")
+    order=()
+    
+    for choice in $choices; do
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -gt 0 ] && [ "$choice" -le "${#original_order[@]}" ]; then
+            order+=("${original_order[$((choice-1))]}")
+        fi
+    done
+    
+    # Verificar se foram selecionadas ferramentas válidas
+    if [ ${#order[@]} -eq 0 ]; then
+        echo -e "${RED}[ERRO]${NC} Nenhuma ferramenta válida selecionada. Saindo."
+        exit 1
+    fi
+        
+    echo -e "\n${GREEN}Selecionadas ${#order[@]} ferramentas para instalação:${NC}"
+    for tool in "${order[@]}"; do
+        echo -e "${GREEN}- ${NC}$tool"
+    done
+    
+    # Confirmação antes de continuar e criar o arquivo de estado
+    echo -n -e "\n${YELLOW}Continuar com a instalação destas ferramentas? (s/n): ${NC}"
+    read -r confirm
+    if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
+        echo -e "${YELLOW}[AVISO]${NC} Instalação cancelada pelo usuário."
+        exit 0
+    fi
+    
+    # Só salvamos o estado após a confirmação do usuário
+    # Isso evita criar o arquivo .install_state prematuramente
+    save_state 0 ""
+}
+
+# show_progress()
+# Função para exibir barra de progresso
 show_progress() {
     local current=$1
     local total=$2
+    local tool_name=$3
 
     if [ -z "$current" ] || [ -z "$total" ] || [ "$total" -eq 0 ]; then
         return
@@ -341,49 +327,193 @@ show_progress() {
     local perc=$(( (current * 100) / total ))
     local filled=$(( (perc * 50) / 100 ))
     local unfilled=$(( 50 - filled ))
-
+    local status=""
+    
+    # Determina a cor com base no percentual de conclusão
+    local color="${BLUE}"
+    if [ "$perc" -lt 99 ]; then
+        color="${RED}"
+    elif [ "$perc" -le 100 ]; then
+        color="${GREEN}"
+    fi
+    
     # Move o cursor uma linha para cima e atualiza a barra de progresso
-    echo -ne "\r\e[1A\e[KProgresso: |$(printf '#%.0s' $(seq 1 $filled))$(printf ' %.0s' $(seq 1 $unfilled))| $perc% "
+    echo -ne "\r\e[KProgresso: |${color}$(printf '#%.0s' $(seq 1 $filled))${NC}$(printf ' %.0s' $(seq 1 $unfilled))| ${color}$perc%${NC}\n"
+}
+
+# handle_interrupt()
+# Função para tratamento de interrupções (CTRL+C)
+handle_interrupt() {
+    echo -e "\n${YELLOW}[AVISO]${NC} Instalação interrompida pelo usuário"
+    
+    # Só salvar o estado se já estivermos no processo de instalação
+    # (após o menu de seleção de ferramentas)
+    if [ "$INSTALLATION_STARTED" == "true" ]; then
+        log "AVISO" "Instalação interrompida pelo usuário no progresso: $progress de $total_commands"
+        save_state "$progress" "${installed_tools[*]}"
+        echo -e "${YELLOW}[AVISO]${NC} Estado da instalação salvo. Execute novamente o script para continuar."
+    else
+        log "AVISO" "Script interrompido pelo usuário antes do início da instalação"
+        echo -e "${YELLOW}[AVISO]${NC} Nenhuma instalação iniciada. Nenhum estado salvo."
+        # Garantir que qualquer arquivo de estado parcial seja removido
+        rm -f "$RESUME_FILE"
+    fi
+    exit 130
 }
 
 
 # Corra Forrest, corra...
+banner
 
-# checar permissao de superusuario 
+# Checar privilégios de superusuário
 if [ "$EUID" -ne 0 ]; then
-    colored_echo "ERRO: Necessario privilegios de superusuario."
-    colored_echo "      Utilize sudo $0"
+    echo -e "${RED}[ERRO]${NC} Necessário privilégios de superusuário."
+    echo -e "${YELLOW}[DICA]${NC} Execute: sudo $0"
     exit 1
 fi
 
-# checar sistema operacional
-check_os
-
-# exibir banner
-banner
-
-# Inicialmente exibe a barra de progresso em 0%
-show_progress 0 ${#order[@]}
-echo # Cria uma linha vazia após a barra de progresso
-total_commands=${#order[@]}
-progress=0
+# Inicializar arquivo de log
+mkdir -p "$(dirname "$LOG_FILE")"
+echo "# Log de instalação iniciado em $(date '+%Y-%m-%d %H:%M:%S')" > "$LOG_FILE"
+log "INFO" "Iniciando execução do script myReconVPS.sh v$SCRIPT_VERSION" "no_console_output"
 
 # Identificar tipo de shell
+SHELL_TYPE=$(basename "$SHELL")
 CONFIG_FILE=$HOME/$(case $SHELL_TYPE in bash) echo '.bashrc' ;; zsh) echo '.zshrc' ;; *) echo '.profile' ;; esac)
+log "INFO" "Shell detectado: $SHELL_TYPE, usando arquivo de configuração: $CONFIG_FILE" "no_console_output"
+
+# Carregar configurações de ferramentas
+TOOLS_CONF="$SCRIPT_DIR/myReconVPS.tools"
+if [ -f "$TOOLS_CONF" ]; then
+    log "INFO" "Carregando configurações de ferramentas de $TOOLS_CONF" "no_console_output"
+    # Inicializar o array order vazio antes de carregar as configurações
+    order=()
+    source "$TOOLS_CONF"
+else
+    log "ERRO" "Arquivo de configuração $TOOLS_CONF não encontrado" "no_console_output"
+    echo -e "${RED}[ERRO]${NC} Arquivo de configuração $TOOLS_CONF não encontrado"
+    echo -e "Execução interrompida. Saindo..."
+    exit 1
+fi
+
+# Verificar se temos ferramentas carregadas
+if [ ${#order[@]} -eq 0 ]; then
+    log "ERRO" "Nenhuma ferramenta foi carregada do arquivo de configuração" "no_console_output"
+    echo -e "${RED}[ERRO]${NC} Nenhuma ferramenta foi carregada do arquivo de configuração"
+    echo -e "Execução interrompida. Saindo..."
+    exit 1
+fi
+
+# Checar compatibilidade com o sistema operacional
+check_os
+
+# Verificar espaço mínimo em disco
+check_disk_space
+
+# Verificar instalação de dependências
+check_dependencies
+
+# Opções de linha de comando
+while getopts ":ha" opt; do
+    case ${opt} in
+    h )
+        echo -e "\n${CYAN}Uso:${NC} $0 [-h] [-a]\n"
+        echo -e "${CYAN}Opções:${NC}"
+        echo -e "  -h\tExibe esta ajuda"
+        echo -e "  -a\tInstala todas as ferramentas sem perguntar\n"
+        exit 0
+        ;;
+    a )
+        INSTALL_ALL=true
+        log "INFO" "Modo de instalação automática ativado (todas as ferramentas)"
+        ;;
+    \? )
+        echo -e "${RED}[ERRO]${NC} Opção inválida: -$OPTARG" 1>&2
+        echo -e "${YELLOW}[DICA]${NC} Use -h para ajuda\n"
+        exit 1
+        ;;
+    esac
+done
+
+# Capturar interrupções
+trap handle_interrupt SIGINT SIGTERM
+
+# Array para armazenar ferramentas instaladas com sucesso
+declare -a installed_tools
+
+# Verificar se deve retomar uma instalação anterior
+progress=0
+if [ -f "$RESUME_FILE" ] && load_state; then
+    # Se retornar 0, há uma instalação a ser retomada
+    progress=$PROGRESS
+    # Reconstituir a lista de ferramentas já instaladas
+    for tool in "${TOOLS_DONE[@]}"; do
+        installed_tools+=("$tool")
+    done
+fi
+
+# Permitir seleção de ferramentas se não estiver em modo automático
+select_tools
+
+# Calcular número total de comandos
+total_commands=${#order[@]}
+log "INFO" "Total de ferramentas para instalação: $total_commands"
+
+# Verificar se existem ferramentas selecionadas (pode acontecer em casos de erro)
+if [ ${#order[@]} -eq 0 ]; then
+    log "ERRO" "Lista de ferramentas vazia após seleção. Possível erro de processamento."
+    echo -e "\n${RED}[ERRO]${NC} Nenhuma ferramenta na lista de instalação. Saindo."
+    rm -f "$RESUME_FILE"
+    exit 1
+fi
 
 # Executar comandos de instalação na ordem definida
 start_time=$(date +%s)
+log "INFO" "Iniciando processo de instalação das ferramentas"
+
+# Marcar que a instalação foi iniciada (usado para gerenciar interrupções)
+INSTALLATION_STARTED=true
 
 for tool in "${order[@]}"; do
+    echo -e "\n---\n"
+
+    # Verificar se a ferramenta já foi instalada em uma execução anterior
+    if [[ " ${installed_tools[*]} " =~ " $tool " ]]; then
+        log "INFO" "Pulando $tool... Instalação previamente detectada" "no_console_output"
+        echo -e "${YELLOW}[AVISO]${NC} Pulando $tool... Instalação previamente detectada"
+        continue
+    fi
+    
     cmd="${commands[$tool]}"
     
-    show_progress $progress $total_commands
-    colored_echo "blue" " Instalando $tool. \033[5mAguarde..."
-    eval "$cmd" > /dev/null 2>&1
+    show_progress $progress $total_commands "$tool"
+    log "INFO" "Instalando $tool" "no_console_output"
+    echo -e "\n${CYAN}[INFO]${NC} Instalando $tool. ${YELLOW}Aguarde...${NC}"
     
-    if [ $? -ne 0 ]; then
-        colored_echo "red" "\n[ERRO] Falha no comando $tool"
-        exit 1
+    # Capturar saída do comando para log e análise de erro
+    output=$(eval "$cmd" 2>&1)
+    exit_code=$?
+    
+    # Verificar resultado da instalação
+    if ! check_result "$tool" "$exit_code" "$output"; then
+        log "ERRO" "Detalhes do erro: $output"
+        echo -e "${RED}[ERRO]${NC} Falha ao instalar $tool"
+        echo -e "${YELLOW}[DICA]${NC} Verifique o log para mais detalhes: $LOG_FILE"
+        echo -n -e "\n${YELLOW}[AVISO]${NC} Deseja continuar com as próximas ferramentas? (s/n): "
+        read -r choice
+        if [[ "$choice" != "s" && "$choice" != "S" ]]; then
+            log "INFO" "Instalação interrompida pelo usuário após falha em: $tool"
+            save_state "$progress" "${installed_tools[*]}"
+            exit 1
+        fi
+        # Adiciona à lista de ferramentas puladas
+        skipped_tools["$tool"]="Falha de instalação"
+    else
+        # Adiciona à lista de ferramentas instaladas com sucesso
+        installed_tools+=("$tool")
+        # Grava o progresso atual para possível retomada
+        save_state "$progress" "${installed_tools[*]}"
+        echo -e "${GREEN}[OK]${NC} $tool instalado com sucesso"
     fi
 
     progress=$((progress + 1))
@@ -393,16 +523,45 @@ end_time=$(date +%s)
 execution_time=$((end_time - start_time))
 execution_time_formatted=$(printf "%02d:%02d:%02d" $((execution_time/3600)) $(( (execution_time%3600)/60 )) $((execution_time%60)))
 
-echo -ne "\r\e[1A\e[KProgresso: |################################################## | 100%"
-colored_echo "green" " Instalacao concluida!"
+echo -e "\n---\n"
 
-echo -e "\n[Lista de Ferramentas]"
-for tool in "${order[@]}"; do
-    colored_echo "blue" " > $tool"
+show_progress $total_commands $total_commands
+echo -e "\n${GREEN}Instalação concluída!${NC}"
+log "INFO" "Processo de instalação finalizado em $execution_time_formatted"
+
+# Exibir resumo das instalações
+echo -e "\n${CYAN}[RESUMO DA INSTALAÇÃO]${NC}"
+echo -e "${CYAN}Tempo total:${NC} $execution_time_formatted"
+echo -e "${CYAN}Ferramentas solicitadas:${NC} $total_commands"
+echo -e "${CYAN}Ferramentas instaladas:${NC} ${#installed_tools[@]}"
+
+if [ ${#failed_tools[@]} -gt 0 ]; then
+    echo -e "\n${RED}[FERRAMENTAS COM FALHA]${NC}"
+    for tool in "${failed_tools[@]}"; do
+        echo -e "${RED}- ${NC}$tool"
+    done
+fi
+
+if [ ${#skipped_tools[@]} -gt 0 ]; then
+    echo -e "\n${YELLOW}[FERRAMENTAS PULADAS]${NC}"
+    for tool in "${!skipped_tools[@]}"; do
+        echo -e "${YELLOW}- ${NC}$tool: ${skipped_tools[$tool]}"
+    done
+fi
+
+echo -e "\n${GREEN}[FERRAMENTAS INSTALADAS]${NC}"
+for tool in "${installed_tools[@]}"; do
+    echo -e "${GREEN}- ${NC}$tool"
 done
-colored_echo "blue" "\n${#order[@]} ferramentas instaladas ou atualizadas em $execution_time_formatted."
 
-colored_echo "red" "\nAtualize a sessao atual do shell com o comando:"
-colored_echo "red" " source $CONFIG_FILE"
+# Remover arquivo de estado se a instalação for concluída com sucesso
+if [ $progress -eq $total_commands ]; then
+    log "INFO" "Instalação concluída com sucesso. Removendo arquivo de estado." "no_console_output"
+    rm -f "$RESUME_FILE"
+fi
 
-colored_echo "yellow" "\nHack the Planet!"
+echo -e "\n${YELLOW}Atualize a sessão atual do shell com o comando:${NC}"
+echo -e " ${YELLOW}source $CONFIG_FILE${NC}"
+
+log "INFO" "Execução do script finalizada com sucesso" "no_console_output"
+echo -e "\n${GREEN}Hack the Planet!${NC}"
