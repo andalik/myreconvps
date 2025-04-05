@@ -1,0 +1,338 @@
+# myReconVPS.tools - Arquivo de configuração de ferramentas
+# Renato Andalik
+
+# ULTIMA ATUALIZACAO: 05/04/2025
+
+# INSTRUCOES
+# Adicione comandos para instalacao de ferramentas no formato:
+#  commands["toolname1"]="command1 | command2 | ..."
+# A ordem de instalação será determinada pela ordem em que as ferramentas são definidas neste arquivo.
+
+# Tratamento de variaveis e caracteres especiais
+#  Aspas duplas sao utilizadas para delimitar o comando completo, portanto,
+#  na sua construcao de comando, utilize APENAS aspas simples.
+#  Em variaveis, utilize o caractere de escape.
+#  Por exemplo, $LATEST_VERSION fica \$LATEST_VERSION
+
+# Variaveis disponiveis para uso nos comandos:
+#  CONFIG_FILE 
+#  | aponta para o arquivo de configuracao de sessao utilizado pelo shell
+#  | (.profile, .bashrc ou .zshrc) 
+
+# Configurações gerais
+min_space=5 # Espaço mínimo em disco (GB)
+
+# Mandatorios
+commands["ubuntu-update"]="apt-get update && apt-get -y upgrade"
+order+=("ubuntu-update")
+
+commands["basic-tools"]="apt-get -y install snapd git curl wget unzip gzip ftp telnet tcpdump net-tools ca-certificates"
+order+=("basic-tools")
+
+commands["go"]="LATEST_VERSION=\`curl -s https://go.dev/dl/ | grep filename | grep download | grep 'go[0-9\.]\+\.linux-amd64\.tar\.gz' | head -n 1 | awk -F '/dl/' '{print \$2}' | awk -F '\"' '{print \$1}'\` && wget https://go.dev/dl/\$LATEST_VERSION && rm -rf /usr/local/go && tar -C /usr/local -xzf \$LATEST_VERSION && rm -f \$LATEST_VERSION && grep -q 'export PATH=\$PATH:/usr/local/go/bin' \$CONFIG_FILE || echo 'export PATH=\$PATH:/usr/local/go/bin' >> \$CONFIG_FILE && source \$CONFIG_FILE"
+order+=("go")
+
+commands["python3"]="apt-get -y install python3-pip"
+order+=("python3")
+
+# Programas Variados
+commands["airixss"]="go install github.com/ferreiraklet/airixss@latest && mkdir /opt/airixss ; mv -f ~/go/bin/airixss /opt/airixss/ && grep -q 'export PATH=\$PATH:/opt/airixss' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/airixss' >> \$CONFIG_FILE"
+order+=("airixss")
+
+commands["amass"]="apt-get -y install g++-x86-64-linux-gnu libc6-dev-amd64-cross ; go install -v github.com/owasp-amass/amass/v4/...@master && mkdir /opt/amass ; mv -f ~/go/bin/amass /opt/amass/ && grep -q 'export PATH=\$PATH:/opt/amass' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/amass' >> \$CONFIG_FILE"
+order+=("amass")
+
+commands["anew"]="go install github.com/tomnomnom/anew@latest && mkdir /opt/anew ; mv -f ~/go/bin/anew /opt/anew/ && grep -q 'export PATH=\$PATH:/opt/anew' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/anew' >> \$CONFIG_FILE"
+order+=("anew")
+
+commands["archivefuzz"]="git clone https://github.com/devanshbatham/ArchiveFuzz && cd ArchiveFuzz && pip3 install -r requirements.txt && cd .. && cp -rf ArchiveFuzz/ /opt/archivefuzz && rm -rf ArchiveFuzz && grep -q 'export PATH=\$PATH:/opt/archivefuzz' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/archivefuzz' >> \$CONFIG_FILE"
+order+=("archivefuzz")
+
+commands["arjun"]="pip3 install arjun"
+order+=("arjun")
+
+commands["assetfinder"]="go install github.com/tomnomnom/assetfinder@latest && mkdir /opt/assetfinder ; mv -f ~/go/bin/assetfinder /opt/assetfinder/ && grep -q 'export PATH=\$PATH:/opt/assetfinder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/assetfinder' >> \$CONFIG_FILE"
+order+=("assetfinder")
+
+commands["cdncheck"]="go install -v github.com/projectdiscovery/cdncheck/cmd/cdncheck@latest && mkdir /opt/cdncheck ; mv -f ~/go/bin/cdncheck /opt/cdncheck/ && grep -q 'export PATH=\$PATH:/opt/cdncheck' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/cdncheck' >> \$CONFIG_FILE"
+order+=("cdncheck")
+
+commands["cent"]="go install -v github.com/xm1k3/cent@latest && mkdir /opt/cent ; mv -f ~/go/bin/cent /opt/cent/ && grep -q 'export PATH=\$PATH:/opt/cent' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/cent' >> \$CONFIG_FILE"
+order+=("cent")
+
+commands["cf-check"]="go install github.com/dwisiswant0/cf-check@latest && mkdir /opt/cf-check ; mv -f ~/go/bin/cf-check /opt/cf-check/ && grep -q 'export PATH=\$PATH:/opt/cf-check' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/cf-check' >> \$CONFIG_FILE"
+order+=("cf-check")
+
+commands["chaos"]="go install -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest && mkdir /opt/chaos ; mv -f ~/go/bin/chaos /opt/chaos/ && grep -q 'export PATH=\$PATH:/opt/chaos' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/chaos' >> \$CONFIG_FILE"
+order+=("chaos")
+
+commands["dalfox"]="go install github.com/hahwul/dalfox/v2@latest && mkdir /opt/dalfox ; mv -f ~/go/bin/dalfox /opt/dalfox/ && grep -q 'export PATH=\$PATH:/opt/dalfox' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dalfox' >> \$CONFIG_FILE"
+order+=("dalfox")
+
+commands["dirsearch"]="git clone https://github.com/maurosoria/dirsearch.git --depth 1 && cd dirsearch && pip3 install -r requirements.txt && cd .. && cp -rf dirsearch/ /opt/ && rm -rf dirsearch && grep -q 'export PATH=\$PATH:/opt/dirsearch' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dirsearch' >> \$CONFIG_FILE"
+order+=("dirsearch")
+
+commands["dnsdumpster"]="git clone https://github.com/nmmapper/dnsdumpster.git && cd dnsdumpster && pip3 install -r requirements.txt && cd .. && cp -rf dnsdumpster/ /opt/ && rm -rf dnsdumpster && grep -q 'export PATH=\$PATH:/opt/dnsdumpster' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dnsdumpster' >> \$CONFIG_FILE"
+order+=("dnsdumpster")
+
+commands["dnsexpire"]="git clone https://github.com/gwen001/dnsexpire && cp -rf dnsexpire/ /opt/ && rm -rf dnsexpire && grep -q 'export PATH=\$PATH:/opt/dnsexpire' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dnsexpire' >> \$CONFIG_FILE"
+order+=("dnsexpire")
+
+commands["dnsgen"]="python3 -m pip install dnsgen"
+order+=("dnsgen")
+
+commands["dnspy"]="git clone https://github.com/gwen001/dnspy && cd dnspy && pip3 install -r requirements.txt && cd .. && cp -rf dnspy/ /opt/ && rm -rf dnspy && grep -q 'export PATH=\$PATH:/opt/dnspy' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dnspy' >> \$CONFIG_FILE"
+order+=("dnspy")
+
+commands["dnsvalidator"]="git clone https://github.com/vortexau/dnsvalidator.git && cd dnsvalidator && python3 setup.py install && cd .. && cp -rf dnsvalidator/ /opt/ && rm -rf dnsvalidator && grep -q 'export PATH=\$PATH:/opt/dnsvalidator' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dnsvalidator' >> \$CONFIG_FILE"
+order+=("dnsvalidator")
+
+commands["dnsx"]="go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest && mkdir /opt/dnsx ; mv -f ~/go/bin/dnsx /opt/dnsx/ && grep -q 'export PATH=\$PATH:/opt/dnsx' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/dnsx' >> \$CONFIG_FILE"
+order+=("dnsx")
+
+commands["exif"]="apt-get -y install libimage-exiftool-perl"
+order+=("exif")
+
+commands["exploitdb"]="git clone https://gitlab.com/exploit-database/exploitdb.git && mkdir /opt/exploitdb ; cp -rf exploitdb/ /opt/ && rm -rf exploitdb && grep -q 'export PATH=\$PATH:/opt/exploitdb' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/exploitdb' >> \$CONFIG_FILE"
+order+=("exploitdb")
+
+commands["ffuf"]="git clone https://github.com/ffuf/ffuf && cd ffuf && go get && go build && cd .. && mkdir /opt/ffuf ; cp -rf ffuf/ /opt/ && rm -rf ffuf && grep -q 'export PATH=\$PATH:/opt/ffuf' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/ffuf' >> \$CONFIG_FILE"
+order+=("ffuf")
+
+commands["findomain"]="curl -LO https://github.com/findomain/findomain/releases/latest/download/findomain-linux.zip && unzip findomain-linux.zip && chmod +x findomain && mkdir /opt/findomain ; mv -f findomain /opt/findomain/ && rm -f findomain-linux.zip && grep -q 'export PATH=\$PATH:/opt/findomain' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/findomain' >> \$CONFIG_FILE"
+order+=("findomain")
+
+commands["freq"]="go install github.com/takshal/freq@latest && mkdir /opt/freq ; mv -f ~/go/bin/freq /opt/freq/ && grep -q 'export PATH=\$PATH:/opt/freq' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/freq' >> \$CONFIG_FILE"
+order+=("freq")
+
+commands["gau"]="go install github.com/lc/gau/v2/cmd/gau@latest && mkdir /opt/gau ; mv -f ~/go/bin/gau /opt/gau/ && grep -q 'export PATH=\$PATH:/opt/gau' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gau' >> \$CONFIG_FILE"
+order+=("gau")
+
+commands["gauplus"]="go install github.com/bp0lr/gauplus@latest && mkdir /opt/gauplus ; mv -f ~/go/bin/gauplus /opt/gauplus/ && grep -q 'export PATH=\$PATH:/opt/gauplus' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gauplus' >> \$CONFIG_FILE"
+order+=("gauplus")
+
+commands["geospy"]="pip3 install geospyer"
+order+=("geospy")
+
+commands["getjs"]="go install github.com/003random/getJS@latest && mkdir /opt/getjs ; mv -f ~/go/bin/getJS /opt/getjs/getjs && grep -q 'export PATH=\$PATH:/opt/getjs' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/getjs' >> \$CONFIG_FILE"
+order+=("getjs")
+
+commands["gf"]="go install github.com/tomnomnom/gf@latest && mkdir /opt/gf ; mv -f ~/go/bin/gf /opt/gf/ && grep -q 'export PATH=\$PATH:/opt/gf' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gf' >> \$CONFIG_FILE"
+order+=("gf")
+
+commands["gitdorker"]="git clone https://github.com/obheda12/GitDorker.git && cd GitDorker && pip3 install -r requirements.txt && cd .. && cp -rf GitDorker/ /opt/gitdorker && rm -rf GitDorker && grep -q 'export PATH=\$PATH:/opt/gitdorker' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gitdorker' >> \$CONFIG_FILE"
+order+=("gitdorker")
+
+commands["github-search"]="git clone https://github.com/gwen001/github-search && cd github-search && pip3 install -r requirements.txt && cd .. && cp -rf github-search/ /opt/ && rm -rf github-search && grep -q 'export PATH=\$PATH:/opt/github-search' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/github-search' >> \$CONFIG_FILE"
+order+=("github-search")
+
+commands["github-subdomains"]="go install github.com/gwen001/github-subdomains@latest && mkdir /opt/github-subdomains ; mv -f ~/go/bin/github-subdomains /opt/github-subdomains/ && grep -q 'export PATH=\$PATH:/opt/github-subdomains' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/github-subdomains' >> \$CONFIG_FILE"
+order+=("github-subdomains")
+
+commands["github-endpoints"]="go install github.com/gwen001/github-endpoints@latest && mkdir /opt/github-endpoints ; mv -f ~/go/bin/github-endpoints /opt/github-endpoints/ && grep -q 'export PATH=\$PATH:/opt/github-endpoints' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/github-endpoints' >> \$CONFIG_FILE"
+order+=("github-endpoints")
+
+commands["gittools"]="git clone https://github.com/internetwache/GitTools.git && cd GitTools/Finder && pip3 install -r requirements.txt && cd ../.. && cp -rf GitTools/ /opt/gittools && rm -rf GitTools && grep -q 'export PATH=\$PATH:/opt/gittools' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gittools' >> \$CONFIG_FILE"
+order+=("gittools")
+
+commands["gobuster"]="go install github.com/OJ/gobuster/v3@latest && mkdir /opt/gobuster ; mv -f ~/go/bin/gobuster /opt/gobuster/ && grep -q 'export PATH=\$PATH:/opt/gobuster' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gobuster' >> \$CONFIG_FILE"
+order+=("gobuster")
+
+commands["goop"]="go install github.com/deletescape/goop@latest && mkdir /opt/goop ; mv -f ~/go/bin/goop /opt/goop/ && grep -q 'export PATH=\$PATH:/opt/goop' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/goop' >> \$CONFIG_FILE"
+order+=("goop")
+
+commands["gospider"]="GO111MODULE=on go install github.com/jaeles-project/gospider@latest && mkdir /opt/gospider ; mv -f ~/go/bin/gospider /opt/gospider && grep -q 'export PATH=\$PATH:/opt/gospider' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gospider' >> \$CONFIG_FILE"
+order+=("gospider")
+
+commands["gowitness"]="go install github.com/sensepost/gowitness@latest && mkdir /opt/gowitness ; mv -f ~/go/bin/gowitness /opt/gowitness/ && grep -q 'export PATH=\$PATH:/opt/gowitness' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gowitness' >> \$CONFIG_FILE"
+order+=("gowitness")
+
+commands["gxss"]="go install github.com/KathanP19/Gxss@latest && mkdir /opt/gxss ; mv -f ~/go/bin/Gxss /opt/gxss/gxss && grep -q 'export PATH=\$PATH:/opt/gxss' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/gxss' >> \$CONFIG_FILE"
+order+=("gxss")
+
+commands["hakcheckurl"]="go install github.com/hakluke/hakcheckurl@latest && mkdir /opt/hakcheckurl ; mv -f ~/go/bin/hakcheckurl /opt/hakcheckurl/ && grep -q 'export PATH=\$PATH:/opt/hakcheckurl' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/hakcheckurl' >> \$CONFIG_FILE"
+order+=("hakcheckurl")
+
+commands["haklistgen"]="go install github.com/hakluke/haklistgen@latest && mkdir /opt/haklistgen ; mv -f ~/go/bin/haklistgen /opt/haklistgen/ && grep -q 'export PATH=\$PATH:/opt/haklistgen' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/haklistgen' >> \$CONFIG_FILE"
+order+=("haklistgen")
+
+commands["hakrawler"]="go install github.com/hakluke/hakrawler@latest && mkdir /opt/hakrawler ; mv -f ~/go/bin/hakrawler /opt/hakrawler/ && grep -q 'export PATH=\$PATH:/opt/hakrawler' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/hakrawler' >> \$CONFIG_FILE"
+order+=("hakrawler")
+
+commands["hakrevdns"]="go install github.com/hakluke/hakrevdns@latest && mkdir /opt/hakrevdns ; mv -f ~/go/bin/hakrevdns /opt/hakrevdns/ && grep -q 'export PATH=\$PATH:/opt/hakrevdns' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/hakrevdns' >> \$CONFIG_FILE"
+order+=("hakrevdns")
+
+commands["haktldextract"]="go install github.com/hakluke/haktldextract@latest && mkdir /opt/haktldextract ; mv -f ~/go/bin/haktldextract /opt/haktldextract/ && grep -q 'export PATH=\$PATH:/opt/haktldextract' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/haktldextract' >> \$CONFIG_FILE"
+order+=("haktldextract")
+
+commands["haktrails"]="go install -v github.com/hakluke/haktrails@latest && mkdir /opt/haktrails ; mv -f ~/go/bin/haktrails /opt/haktrails/ && grep -q 'export PATH=\$PATH:/opt/haktrails' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/haktrails' >> \$CONFIG_FILE"
+order+=("haktrails")
+
+commands["httprobe"]="go install github.com/tomnomnom/httprobe@latest && mkdir /opt/httprobe ; mv -f ~/go/bin/httprobe /opt/httprobe/ && grep -q 'export PATH=\$PATH:/opt/httprobe' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/httprobe' >> \$CONFIG_FILE"
+order+=("httprobe")
+
+commands["httpx"]="go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && mkdir /opt/httpx ; mv -f ~/go/bin/httpx /opt/httpx/ && grep -q 'export PATH=\$PATH:/opt/httpx' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/httpx' >> \$CONFIG_FILE"
+order+=("httpx")
+
+commands["jsscanner"]="git clone https://github.com/0x240x23elu/JSScanner.git && cd JSScanner && pip3 install -r requirements.txt && cd .. && cp -rf JSScanner/ /opt/jsscanner && rm -rf JSScanner && grep -q 'export PATH=\$PATH:/opt/jsscanner' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/jsscanner' >> \$CONFIG_FILE"
+order+=("jsscanner")
+
+commands["jsubfinder"]="go install github.com/ThreatUnkown/jsubfinder@latest && wget https://raw.githubusercontent.com/ThreatUnkown/jsubfinder/master/.jsf_signatures.yaml && mkdir /opt/jsubfinder ; mv -f ~/go/bin/jsubfinder /opt/jsubfinder/ && mv -f .jsf_signatures.yaml /opt/jsubfinder/ && grep -q 'export PATH=\$PATH:/opt/jsubfinder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/jsubfinder' >> \$CONFIG_FILE"
+order+=("jsubfinder")
+
+commands["katana"]="go install github.com/projectdiscovery/katana/cmd/katana@latest && mkdir /opt/katana ; mv -f ~/go/bin/katana /opt/katana/ && grep -q 'export PATH=\$PATH:/opt/katana' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/katana' >> \$CONFIG_FILE"
+order+=("katana")
+
+commands["knock"]="git clone https://github.com/guelfoweb/knock.git && cd knock && pip3 install -r requirements.txt && cd .. && cp -rf knock/ /opt/ && rm -rf knock && grep -q 'export PATH=\$PATH:/opt/knock' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/knock' >> \$CONFIG_FILE"
+order+=("knock")
+
+commands["linkfinder"]="git clone https://github.com/GerbenJavado/LinkFinder.git && cd LinkFinder && python3 setup.py install && pip3 install -r requirements.txt && cd .. && cp -rf LinkFinder/ /opt/linkfinder && rm -rf LinkFinder && grep -q 'export PATH=\$PATH:/opt/linkfinder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/linkfinder' >> \$CONFIG_FILE"
+order+=("linkfinder")
+
+commands["mariadb-client"]="apt-get -y install mariadb-client"
+order+=("mariadb-client")
+
+commands["masscan"]="apt-get -y install libpcap-dev && git clone https://github.com/robertdavidgraham/masscan && cd masscan && make -j && make install && cd .. && cp -rf masscan/ /opt/ && rm -rf masscan && grep -q 'export PATH=\$PATH:/opt/masscan' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/masscan' >> \$CONFIG_FILE"
+order+=("masscan")
+
+commands["massdns"]="git clone https://github.com/blechschmidt/massdns.git && cd massdns && make && make install && cd .. && cp -rf massdns/ /opt/ && rm -rf massdns && grep -q 'export PATH=\$PATH:/opt/massdns' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/massdns' >> \$CONFIG_FILE"
+order+=("massdns")
+
+commands["meg"]="go install github.com/tomnomnom/meg@latest && mkdir /opt/meg ; mv -f ~/go/bin/meg /opt/meg/ && grep -q 'export PATH=\$PATH:/opt/meg' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/meg' >> \$CONFIG_FILE"
+order+=("meg")
+
+commands["metabigor"]="git clone https://github.com/j3ssie/metabigor.git && cd metabigor && go install && cd .. && rm -rf metabigor && mkdir /opt/metabigor ; mv -f ~/go/bin/metabigor /opt/metabigor/ && grep -q 'export PATH=\$PATH:/opt/metabigor' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/metabigor' >> \$CONFIG_FILE"
+order+=("metabigor")
+
+commands["mildew"]="go install github.com/daehee/mildew/cmd/mildew@latest && mkdir /opt/mildew ; mv -f ~/go/bin/mildew /opt/mildew/ && grep -q 'export PATH=\$PATH:/opt/mildew' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/mildew' >> \$CONFIG_FILE"
+order+=("mildew")
+
+commands["naabu"]="apt-get -y install libpcap-dev ; go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && mkdir /opt/naabu ; mv -f ~/go/bin/naabu /opt/naabu/ && grep -q 'export PATH=\$PATH:/opt/naabu' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/naabu' >> \$CONFIG_FILE"
+order+=("naabu")
+
+commands["netdiscover"]="apt-get -y install netdiscover"
+order+=("netdiscover")
+
+commands["nikto"]="git clone https://github.com/sullo/nikto.git && cp -rf nikto/ /opt/ && rm -rf nikto && grep -q 'export PATH=\$PATH:/opt/nikto' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/nikto' >> \$CONFIG_FILE"
+order+=("nikto")
+
+commands["nilo"]="go install github.com/ferreiraklet/nilo@latest && mkdir /opt/nilo ; mv -f ~/go/bin/nilo /opt/nilo/ && grep -q 'export PATH=\$PATH:/opt/nilo' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/nilo' >> \$CONFIG_FILE"
+order+=("nilo")
+
+commands["nmap"]="apt-get -y install build-essential libssl-dev automake libffi-dev libncurses5-dev zlib1g zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev liblua5.3-dev libbpfcc-dev libpcap-dev libcfg-dev libssh2-1-dev libpcre3-dev libcairo2-dev pkg-config python3-dev python3-venv make gcc && pip3 install build && git clone https://github.com/nmap/nmap.git && cd nmap && make uninstall ; rm -f /usr/local/bin/zenmap ; rm -f /usr/local/share/zenmap ; python_dir=\$(ls /usr/local/lib | grep 'python' | sort -r | head -n 1) ; sudo rm -rf /usr/local/lib/\$python_dir/dist-packages/zenmap* ; ./configure && make && make install && cd .. && rm -rf nmap"
+order+=("nmap")
+
+commands["notify"]="go install -v github.com/projectdiscovery/notify/cmd/notify@latest && mkdir /opt/notify ; mv -f ~/go/bin/notify /opt/notify/ && grep -q 'export PATH=\$PATH:/opt/notify' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/notify' >> \$CONFIG_FILE"
+order+=("notify")
+
+commands["nuclei"]="go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest && mkdir /opt/nuclei ; mv -f ~/go/bin/nuclei /opt/nuclei/ && grep -q 'export PATH=\$PATH:/opt/nuclei' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/nuclei' >> \$CONFIG_FILE"
+order+=("nuclei")
+
+commands["oneforall"]="git clone https://github.com/shmilylty/OneForAll.git && cd OneForAll && python3 -m pip install -U pip setuptools wheel && pip3 install -r requirements.txt && cd .. && mkdir /opt/oneforall ; cp -rf OneForAll/* /opt/oneforall/ && rm -rf OneForAll && grep -q 'export PATH=\$PATH:/opt/oneforall/oneforall' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/oneforall/oneforall' >> \$CONFIG_FILE"
+order+=("oneforall")
+
+commands["paramspider"]="git clone https://github.com/devanshbatham/paramspider && cd paramspider && pip3 install . && cd .. && cp -rf paramspider/ /opt/paramspider && rm -rf paramspider && grep -q 'export PATH=\$PATH:/opt/paramspider' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/paramspider' >> \$CONFIG_FILE"
+order+=("paramspider")
+
+commands["photon"]="git clone https://github.com/s0md3v/Photon.git && cd Photon && pip3 install -r requirements.txt && cd .. && mkdir /opt/photon ; cp -rf Photon/* /opt/photon/ && rm -rf Photon && grep -q 'export PATH=\$PATH:/opt/photon' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/photon' >> \$CONFIG_FILE"
+order+=("photon")
+
+commands["prips"]="apt-get -y install prips"
+order+=("prips")
+
+commands["puredns"]="git clone https://github.com/blechschmidt/massdns.git && cd massdns && make && make install && cd .. && rm -rf massdns && go install github.com/d3mondev/puredns/v2@latest && mkdir /opt/puredns ; mv -f ~/go/bin/puredns /opt/puredns/ && grep -q 'export PATH=\$PATH:/opt/puredns' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/puredns' >> \$CONFIG_FILE"
+order+=("puredns")
+
+commands["qsreplace"]="go install github.com/tomnomnom/qsreplace@latest && mkdir /opt/qsreplace ; mv -f ~/go/bin/qsreplace /opt/qsreplace/ && grep -q 'export PATH=\$PATH:/opt/qsreplace' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/qsreplace' >> \$CONFIG_FILE"
+order+=("qsreplace")
+
+commands["quaithe"]="pip3 install alive_progress && git clone https://github.com/devanshbatham/Quaithe && cd Quaithe && chmod +x setup.sh && ./setup.sh && cd .. && mkdir /opt/quaithe ; cp -rf Quaithe/* /opt/quaithe/ && rm -rf Quaithe && grep -q 'export PATH=\$PATH:/opt/quaithe' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/quaithe' >> \$CONFIG_FILE"
+order+=("quaithe")
+
+commands["rayder"]="go install github.com/devanshbatham/rayder@latest && mkdir /opt/rayder ; mv -f ~/go/bin/rayder /opt/rayder/ && grep -q 'export PATH=\$PATH:/opt/rayder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/rayder' >> \$CONFIG_FILE"
+order+=("rayder")
+
+commands["revwhoix"]="git clone https://github.com/Sybil-Scan/revwhoix && cd revwhoix && pip3 install . && cd .. && cp -rf revwhoix/ /opt/ && rm -rf revwhoix && grep -q 'export PATH=\$PATH:/opt/revwhoix' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/revwhoix' >> \$CONFIG_FILE"
+order+=("revwhoix")
+
+commands["sdlookup"]="go install github.com/j3ssie/sdlookup@latest && mkdir /opt/sdlookup ; mv -f ~/go/bin/sdlookup /opt/sdlookup/ && grep -q 'export PATH=\$PATH:/opt/sdlookup' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/sdlookup' >> \$CONFIG_FILE"
+order+=("sdlookup")
+
+commands["searchsploit"]="apt-get update && apt-get -y install snapd && snap install searchsploit"
+order+=("searchsploit")
+
+commands["secretfinder"]="git clone https://github.com/m4ll0k/SecretFinder.git secretfinder && cd secretfinder && pip3 install -r requirements.txt && cd .. && cp -rf secretfinder/ /opt/ && rm -rf secretfinder && grep -q 'export PATH=\$PATH:/opt/secretfinder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/secretfinder' >> \$CONFIG_FILE"
+order+=("secretfinder")
+
+commands["sherlock"]="pip3 install sherlock-project"
+order+=("sherlock")
+
+commands["shuffledns"]="go install -v github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest && mkdir /opt/shuffledns ; mv -f ~/go/bin/shuffledns /opt/shuffledns/ && grep -q 'export PATH=\$PATH:/opt/shuffledns' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/shuffledns' >> \$CONFIG_FILE"
+order+=("shuffledns")
+
+commands["spiderfoot"]="git clone https://github.com/smicallef/spiderfoot.git && cd spiderfoot && pip3 install -r requirements.txt && cd .. && cp -rf spiderfoot/ /opt/ && rm -rf spiderfoot && grep -q 'export PATH=\$PATH:/opt/spiderfoot' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/spiderfoot' >> \$CONFIG_FILE"
+order+=("spiderfoot")
+
+commands["sqlmap"]="git clone https://github.com/sqlmapproject/sqlmap.git --depth 1 && cp -rf sqlmap/ /opt/ && rm -rf sqlmap && grep -q 'export PATH=\$PATH:/opt/sqlmap' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/sqlmap' >> \$CONFIG_FILE"
+order+=("sqlmap")
+
+commands["subfinder"]="go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && mkdir /opt/subfinder ; mv -f ~/go/bin/subfinder /opt/subfinder/ && grep -q 'export PATH=\$PATH:/opt/subfinder' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/subfinder' >> \$CONFIG_FILE"
+order+=("subfinder")
+
+commands["subjs"]="go install -v github.com/lc/subjs@latest && mkdir /opt/subjs ; mv -f ~/go/bin/subjs /opt/subjs/ && grep -q 'export PATH=\$PATH:/opt/subjs' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/subjs' >> \$CONFIG_FILE"
+order+=("subjs")
+
+commands["sudomy"]="apt-get -y install jq nmap phantomjs npm chromium parallel ; npm i -g wappalyzer wscat ; git clone --recursive https://github.com/screetsec/Sudomy.git && cd Sudomy && pip3 install -r requirements.txt && cd .. && mkdir /opt/sudomy ; cp -rf Sudomy/* /opt/sudomy/ && rm -rf Sudomy && grep -q 'export PATH=\$PATH:/opt/sudomy' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/sudomy' >> \$CONFIG_FILE"
+order+=("sudomy")
+
+commands["sublist3r"]="git clone https://github.com/aboul3la/Sublist3r.git && cd Sublist3r && pip3 install -r requirements.txt && cd .. && mkdir /opt/sublist3r ; cp -rf Sublist3r/* /opt/sublist3r/ && rm -rf Sublist3r && grep -q 'export PATH=\$PATH:/opt/Sublist3r' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/Sublist3r' >> \$CONFIG_FILE"
+order+=("sublist3r")
+
+commands["testssl"]="apt-get update && apt-get -y install snapd && snap install testssl"
+order+=("testssl")
+
+commands["theharvester"]="git clone https://github.com/laramies/theHarvester && cd theHarvester && python3 -m pip install -r requirements/base.txt && cd .. && mkdir /opt/theharvester ; cp -rf theHarvester/* /opt/theharvester/ && rm -rf theHarvester && grep -q 'export PATH=\$PATH:/opt/theharvester' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/theharvester' >> \$CONFIG_FILE"
+order+=("theharvester")
+
+commands["trufflehog"]="git clone https://github.com/trufflesecurity/trufflehog.git && cd trufflehog && go install && cd .. && rm -rf trufflehog && mkdir /opt/trufflehog ; mv -f ~/go/bin/trufflehog /opt/trufflehog/ && grep -q 'export PATH=\$PATH:/opt/trufflehog' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/trufflehog' >> \$CONFIG_FILE"
+order+=("trufflehog")
+
+commands["uncover"]="go install -v github.com/projectdiscovery/uncover/cmd/uncover@latest && mkdir /opt/uncover ; mv -f ~/go/bin/uncover /opt/uncover/ && grep -q 'export PATH=\$PATH:/opt/uncover' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/uncover' >> \$CONFIG_FILE"
+order+=("uncover")
+
+commands["unfurl"]="go install github.com/tomnomnom/unfurl@latest && mkdir /opt/unfurl ; mv -f ~/go/bin/unfurl /opt/unfurl/ && grep -q 'export PATH=\$PATH:/opt/unfurl' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/unfurl' >> \$CONFIG_FILE"
+order+=("unfurl")
+
+commands["uro"]="pip3 install uro"
+order+=("uro")
+
+commands["wafw00f"]="git clone https://github.com/EnableSecurity/wafw00f.git && cd wafw00f && python3 setup.py install && cd .. && cp -rf wafw00f/ /opt/ && rm -rf wafw00f && grep -q 'export PATH=\$PATH:/opt/wafw00f/bin' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/wafw00f/bin' >> \$CONFIG_FILE"
+order+=("wafw00f")
+
+commands["waybackurls"]="go install github.com/tomnomnom/waybackurls@latest && mkdir /opt/waybackurls ; mv -f ~/go/bin/waybackurls /opt/waybackurls/ && grep -q 'export PATH=\$PATH:/opt/waybackurls' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/waybackurls' >> \$CONFIG_FILE"
+order+=("waybackurls")
+
+commands["wfuzz"]="pip3 install wfuzz"
+order+=("wfuzz")
+
+commands["whoxyrm"]="go install github.com/milindpurswani/whoxyrm@latest && mkdir /opt/whoxyrm ; mv -f ~/go/bin/whoxyrm /opt/whoxyrm/ && grep -q 'export PATH=\$PATH:/opt/whoxyrm' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/whoxyrm' >> \$CONFIG_FILE"
+order+=("whoxyrm")
+
+commands["wpscan"]="apt-get update && apt-get -y install ruby && apt-get -y install build-essential libcurl4-openssl-dev libxml2 libxml2-dev libxslt1-dev ruby-dev libgmp-dev zlib1g-dev && gem install wpscan"
+order+=("wpscan")
+
+commands["xs-leaks"]="git clone https://github.com/xsleaks/xsleaks && cd xsleaks/xsinator.com && npm install && cd ../.. && mkdir /opt/xs-leaks ; cp -rf xsleaks/ /opt/xs-leaks/ && rm -rf xsleaks && grep -q 'export PATH=\$PATH:/opt/xs-leaks' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/xs-leaks' >> \$CONFIG_FILE"
+order+=("xs-leaks")
+
+commands["xurlfind3r"]="go install -v github.com/hueristiq/xurlfind3r/cmd/xurlfind3r@latest && mkdir /opt/xurlfind3r ; mv -f ~/go/bin/xurlfind3r /opt/xurlfind3r/ && grep -q 'export PATH=\$PATH:/opt/xurlfind3r' \$CONFIG_FILE || echo 'export PATH=\$PATH:/opt/xurlfind3r' >> \$CONFIG_FILE"
+order+=("xurlfind3r")
+
+# Dicionarios e Similiares
+commands["assetnote-wordlists"]="wget -r --no-parent -R 'index.html*' -e robots=off https://wordlists-cdn.assetnote.io/data/ -nH && mkdir -p /opt/wordlists/assetnote ; cp -rf data/* /opt/wordlists/assetnote/ && rm -rf data"
+order+=("assetnote-wordlists")
+
+commands["seclists"]="git clone https://github.com/danielmiessler/SecLists.git && mkdir -p /opt/wordlists/seclists ; cp -rf SecLists/* /opt/wordlists/seclists/ && rm -rf SecLists"
+order+=("seclists")
+
+commands["resolvers"]="wget https://raw.githubusercontent.com/trickest/resolvers/main/resolvers.txt && wget https://raw.githubusercontent.com/trickest/resolvers/main/resolvers-trusted.txt && mv -f resolvers*.txt /opt/"
+order+=("resolvers")
