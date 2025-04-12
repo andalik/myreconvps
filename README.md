@@ -113,6 +113,11 @@ Obtidos via repositório oficial no GitHub:<br>
  > seclists
  > resolvers
 
+### Instalação
+Se o seu usuário não tem direitos administrativos, digite sudo -su e execute o script diretamente como root.<br>
+Ao final da instalação, replique o caminho das ferramentas instaladas existente no arquivo de configuração do usuário root (busque pelas linhas com o caminho das ferramentas no final do arquivo /root/.bashrc ou /root/.zshrc) para o seu usuário (/home/usuario/.bashrc ou /home/usuario/.zshrc).<br>
+Isso serve para que as ferramentas instaladas também sejam acessíveis no terminal do seu usuário através do comando sudo.
+
 ### Atualização dos Pacotes Obtidos via GITHUB
 Sempre que for necessário atualizar os pacotes já instalados, basta reexecutar o script de instalação.
 
