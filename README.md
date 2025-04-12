@@ -114,11 +114,11 @@ Obtidos via repositório oficial no GitHub:<br>
  > resolvers
 
 ### Instalação
-Se o seu usuário não tem direitos administrativos, digite <b>sudo su</b> e execute o script especificamente como usuário root.<br>
+Se o seu usuário não possui direitos administrativos, digite <b>sudo su</b> e execute o script especificamente como usuário root.<br>
 <br>
-Ao final da instalação, replique o caminho das ferramentas instaladas existente no arquivo de configuração do usuário root (busque pelas linhas com o caminho das ferramentas no final do arquivo /root/.bashrc ou /root/.zshrc) para o seu usuário (/home/usuario/.bashrc ou /home/usuario/.zshrc).<br>
+Ao final da instalação, replique o caminho das ferramentas existentes no arquivo de configuração do usuário root (busque pelas linhas com o caminho das ferramentas no final do arquivo /root/.bashrc ou /root/.zshrc) para o seu usuário (/home/usuario/.bashrc ou /home/usuario/.zshrc).<br>
 <br>
-Isso serve para que as ferramentas instaladas também sejam acessíveis no terminal do seu usuário através do comando sudo.
+Dessa forma, o caminho das ferramentas fica disponível no ambiente do seu usuário, e acessíveis através do comando sudo.
 
 ### Atualização dos Pacotes Obtidos via GITHUB
 Sempre que for necessário atualizar os pacotes já instalados, basta reexecutar o script de instalação.
