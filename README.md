@@ -142,9 +142,10 @@ break-system-packages = true
 ```
 
 Caso o arquivo de configuração do pip não exista, crie-o manualmente.
-
+```
 mkdir -p ~/.config/pip
 echo -e "[global]\nbreak-system-packages=true" > ~/.config/pip/pip.conf
+```
 
 ### Uso dos Templates da Comunidade Nuclei
 Após a instalação das ferramentas, baixe os templates da comunidade para o Nuclei no seu diretório de usuário:
