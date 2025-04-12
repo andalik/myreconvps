@@ -2,7 +2,7 @@
 # myReconVPS.sh - Script para automatizar a instalação de ferramentas
 # Renato Andalik
 
-# ULTIMA ATUALIZACAO: 05/04/2025
+# ULTIMA ATUALIZACAO: 11/04/2025
 
 # Definição de variáveis globais
 declare -A commands
@@ -14,7 +14,7 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 
 LOG_FILE="$SCRIPT_DIR/install_log.txt"
 RESUME_FILE="$SCRIPT_DIR/.install_state"
-SCRIPT_VERSION="1.2025.002"
+SCRIPT_VERSION="1.2025.003"
 SECONDS=0
 RESUME_INSTALL=false
 INSTALLATION_STARTED=false
@@ -514,6 +514,11 @@ for tool in "${order[@]}"; do
         # Grava o progresso atual para possível retomada
         save_state "$progress" "${installed_tools[*]}"
         echo -e "${GREEN}[OK]${NC} $tool instalado com sucesso"
+
+        # Recarrega o arquivo de configuração para tornar a ferramenta disponível imediatamente
+        if [ -f "$CONFIG_FILE" ]; then
+            source "$CONFIG_FILE" 2>/dev/null || true
+        fi
     fi
 
     progress=$((progress + 1))
@@ -559,9 +564,6 @@ if [ $progress -eq $total_commands ]; then
     log "INFO" "Instalação concluída com sucesso. Removendo arquivo de estado." "no_console_output"
     rm -f "$RESUME_FILE"
 fi
-
-echo -e "\n${YELLOW}Atualize a sessão atual do shell com o comando:${NC}"
-echo -e " ${YELLOW}source $CONFIG_FILE${NC}"
 
 log "INFO" "Execução do script finalizada com sucesso" "no_console_output"
 echo -e "\n${GREEN}Hack the Planet!${NC}"
