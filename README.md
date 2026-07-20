@@ -7,15 +7,34 @@
           /____/                                   by Andalik
 </pre>
 
+**myReconVPS** automatiza a instalação e a atualização de um arsenal de ferramentas de reconhecimento e pentest em VPS baseadas em Debian, deixando tudo pronto no `PATH` com um único comando.
 
-### Dependências e Pacotes Terceiros Instalados
-Obtidos via repositório oficial no GitHub:<br>
+`v1.2607.005` · by Andalik
 
+### Requisitos
+- Distribuição baseada em Debian: **Debian 9+**, **Ubuntu 22.04+**, **Kali Linux** ou **Raspbian**
+- Privilégios de **root** (execute com `sudo`)
+- Cerca de **5 GB** de espaço livre em disco (ajustável via `min_space` em `myReconVPS.tools`)
+- `curl`, `wget` e `git` (instalados automaticamente se estiverem ausentes)
+
+### Recursos
+- Interface **TUI** colorida: menu de seleção categorizado, spinner por ferramenta, barra de progresso e resumo final em caixa (com fallback ASCII quando não há suporte a Unicode/cor)
+- Instala **todas** as ferramentas ou apenas as **selecionadas** (menu interativo ou `-a`)
+- **Retomada automática**: se a instalação for interrompida (Ctrl+C), continua de onde parou na próxima execução
+- Configura o **`PATH` automaticamente** no rc do root e do usuário do `sudo` (idempotente)
+- **Contorna o PEP 668** automaticamente (Debian 12+/Kali)
+- Modo **simulação** (`--dry-run`) e log detalhado em `install_log.txt`
+
+### Ferramentas Instaladas
+Lista derivada de `myReconVPS.tools` (fonte da verdade):
+
+**Mandatórios**
  > ubuntu-update
  > basic-tools
- > snap-refresh
  > go
  > python3
+
+**Programas de Reconhecimento**
  > airixss
  > amass
  > anew
@@ -45,6 +64,7 @@ Obtidos via repositório oficial no GitHub:<br>
  > getjs
  > gf
  > gitdorker
+ > github-search
  > github-subdomains
  > github-endpoints
  > gittools
@@ -59,7 +79,6 @@ Obtidos via repositório oficial no GitHub:<br>
  > hakrevdns
  > haktldextract
  > haktrails
- > httpie
  > httprobe
  > httpx
  > jsscanner
@@ -68,6 +87,8 @@ Obtidos via repositório oficial no GitHub:<br>
  > knock
  > linkfinder
  > mariadb-client
+ > masscan
+ > massdns
  > meg
  > metabigor
  > mildew
@@ -106,19 +127,32 @@ Obtidos via repositório oficial no GitHub:<br>
  > uro
  > wafw00f
  > waybackurls
+ > wfuzz
  > whoxyrm
  > wpscan
+ > xs-leaks
  > xurlfind3r
+
+**Dicionários e Wordlists**
  > assetnote-wordlists
  > seclists
  > resolvers
 
 ### Instalação
-Se o seu usuário não possui direitos administrativos, digite <b>sudo su</b> e execute o script especificamente como usuário root.<br>
+Execute o script como root, via `sudo ./myReconVPS.sh` ou entrando como root com <b>sudo su</b>.<br>
 <br>
-Ao final da instalação, replique o caminho das ferramentas existentes no arquivo de configuração do usuário root (busque pelas linhas com o caminho das ferramentas no final do arquivo /root/.bashrc ou /root/.zshrc) para o seu usuário (/home/usuario/.bashrc ou /home/usuario/.zshrc).<br>
+O `PATH` das ferramentas é configurado <b>automaticamente</b>: o script grava as linhas de `export PATH` tanto no rc do root (`/root/.bashrc` ou `.zshrc`) quanto no rc do usuário que invocou o `sudo` (`SUDO_USER`), de forma idempotente. Não é mais necessário copiar manualmente essas linhas.<br>
 <br>
-Dessa forma, o caminho das ferramentas fica disponível no ambiente do seu usuário, e acessíveis através do comando sudo.
+Ao final, atualize a sessão atual do shell com `source ~/.bashrc` (ou `.zshrc`) para que os novos caminhos fiquem disponíveis imediatamente.
+
+#### Opções de linha de comando
+```
+-h, --help       Exibe a ajuda
+-a, --all        Instala/atualiza todas as ferramentas sem perguntar
+-n, --dry-run    Simula a instalação (não executa nada de fato)
+-y, --yes        Responde 'sim' automaticamente às confirmações
+    --no-color   Desativa cores na saída
+```
 
 ### Atualização dos Pacotes Obtidos via GITHUB
 Sempre que for necessário atualizar os pacotes já instalados, basta reexecutar o script de instalação.
@@ -133,15 +167,9 @@ error: externally-managed-environment
     python3-xyz, where xyz is the package you are trying to
     install.
 
-Para que o instalador funcione adequadamente, as seguintes alterações são necessárias:
-```
-vi ~/.config/pip/pip.conf
+O script agora <b>configura isso automaticamente</b>: cria `~/.config/pip/pip.conf` (para o root e para o usuário do `sudo`) com `break-system-packages = true`, de forma idempotente. Nenhuma ação manual é necessária.
 
-[global]
-break-system-packages = true 
-```
-
-Caso o arquivo de configuração do pip não exista, crie-o manualmente.
+Caso queira configurar manualmente em outro ambiente:
 ```
 mkdir -p ~/.config/pip
 echo -e "[global]\nbreak-system-packages=true" > ~/.config/pip/pip.conf
