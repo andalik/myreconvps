@@ -2,36 +2,88 @@
 # myReconVPS.sh - Script para automatizar a instalação de ferramentas
 # Renato Andalik
 
-# ULTIMA ATUALIZACAO: 11/04/2025
+# ULTIMA ATUALIZACAO: 19/07/2026
+
+# Falhas em qualquer parte de um pipe propagam o código de erro (evita que
+# falhas fiquem mascaradas). NÃO usamos 'set -e': o fluxo depende de inspecionar
+# $? por ferramenta e continuar.
+set -o pipefail
 
 # Definição de variáveis globais
 declare -A commands
 declare -a order
 declare -a failed_tools
 declare -A skipped_tools
+declare -a installed_tools
+declare -a menu_cat_of   # categoria de cada índice de "order" (para o menu)
+declare -a RC_FILES      # arquivos de rc a atualizar (root e, se houver, usuário do sudo)
 
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 
 LOG_FILE="$SCRIPT_DIR/install_log.txt"
 RESUME_FILE="$SCRIPT_DIR/.install_state"
-SCRIPT_VERSION="1.2025.003"
+SCRIPT_VERSION="1.2607.005"
 SECONDS=0
 RESUME_INSTALL=false
 INSTALLATION_STARTED=false
 
-# Cores para saída no terminal
-RED="\033[0;31m"
-GREEN="\033[0;32m"
-YELLOW="\033[0;33m"
-BLUE="\033[0;34m"
-PURPLE="\033[0;35m"
-CYAN="\033[0;36m"
-NC="\033[0m" # No Color
+# Flags de linha de comando (valores padrão)
+INSTALL_ALL=false
+DRY_RUN=false
+ASSUME_YES=false
+USE_COLOR=auto
+SHOW_HELP=false
+INVALID_OPT=false
+
+# setup_ui()
+# Configura cores e glifos de acordo com o terminal (TTY, NO_COLOR, UTF-8).
+# Mantém toda a saída segura quando redirecionada para arquivo/pipe/CI.
+setup_ui() {
+    local color_on=true
+    if [ "$USE_COLOR" = off ] || [ -n "${NO_COLOR:-}" ] || { [ "$USE_COLOR" = auto ] && [ ! -t 1 ]; }; then
+        color_on=false
+    fi
+
+    if [ "$color_on" = true ]; then
+        RED="\033[0;31m"; GREEN="\033[0;32m"; YELLOW="\033[0;33m"
+        BLUE="\033[0;34m"; PURPLE="\033[0;35m"; CYAN="\033[0;36m"
+        BOLD="\033[1m"; DIM="\033[2m"; NC="\033[0m"
+    else
+        RED=""; GREEN=""; YELLOW=""; BLUE=""; PURPLE=""; CYAN=""
+        BOLD=""; DIM=""; NC=""
+    fi
+
+    # Glifos: usa Unicode quando o locale é UTF-8, senão cai para ASCII.
+    if [[ "${LC_ALL:-}${LC_CTYPE:-}${LANG:-}" == *[Uu][Tt][Ff]* ]]; then
+        BAR_FILL='█'; BAR_EMPTY='░'
+        BOX_H='─'; BOX_V='│'; BOX_TL='┌'; BOX_TR='┐'; BOX_BL='└'; BOX_BR='┘'
+        SPIN=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+        ARROW='›'
+    else
+        BAR_FILL='#'; BAR_EMPTY='-'
+        BOX_H='-'; BOX_V='|'; BOX_TL='+'; BOX_TR='+'; BOX_BL='+'; BOX_BR='+'
+        SPIN=('|' '/' '-' '\')
+        ARROW='>'
+    fi
+}
+
+# print_help()
+# Exibe a ajuda de uso do script.
+print_help() {
+    echo -e "\n${CYAN}${BOLD}myReconVPS${NC} v${SCRIPT_VERSION}\n"
+    echo -e "${CYAN}Uso:${NC} $0 [opções]\n"
+    echo -e "${CYAN}Opções:${NC}"
+    echo -e "  -h, --help\t\tExibe esta ajuda"
+    echo -e "  -a, --all\t\tInstala/atualiza todas as ferramentas sem perguntar"
+    echo -e "  -n, --dry-run\t\tSimula a instalação (não executa nada de fato)"
+    echo -e "  -y, --yes\t\tResponde 'sim' automaticamente às confirmações"
+    echo -e "      --no-color\tDesativa cores na saída\n"
+}
 
 # banner()
 # Função para exibir o banner
 banner() {
-    clear
+    clear 2>/dev/null || true
 
     echo -e "${GREEN}"
     echo -e '                  _____                  __      _______   _____'
@@ -55,12 +107,63 @@ log() {
     local message=$2
     local silent=$3
     local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    
+
     if [ -z "$silent" ]; then
         echo "[$timestamp] [$level] $message" | tee -a "$LOG_FILE"
     else
         echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
     fi
+}
+
+# confirm()
+# Pergunta sim/não ao usuário. Respeita a flag -y (ASSUME_YES).
+# Retorna 0 para "sim", 1 para "não".
+confirm() {
+    local prompt=$1 ans
+    if [ "$ASSUME_YES" = true ]; then
+        return 0
+    fi
+    read -rp "$prompt" ans
+    [[ "$ans" =~ ^[sSyY]$ ]]
+}
+
+# add_path()
+# Adiciona um ou mais diretórios ao PATH: persiste (idempotente) em todos os
+# arquivos de rc de RC_FILES (root e usuário do sudo) e também no PATH da
+# sessão atual. Substitui o antigo padrão 'grep -q ... || echo ... >> CONFIG',
+# que mascarava falhas retornando 0 mesmo quando a etapa anterior falhava.
+add_path() {
+    local dir line rc
+    for dir in "$@"; do
+        line="export PATH=\$PATH:$dir"
+        for rc in "${RC_FILES[@]}"; do
+            [ -f "$rc" ] || : > "$rc"
+            grep -qxF "$line" "$rc" 2>/dev/null || printf '%s\n' "$line" >> "$rc"
+        done
+        case ":$PATH:" in
+            *":$dir:"*) ;;
+            *) export PATH="$PATH:$dir" ;;
+        esac
+    done
+}
+
+# repeat_str()
+# Repete uma string (inclusive multibyte/UTF-8) N vezes. Usar isto em vez de
+# 'tr ' ' "$char"' porque o tr opera por byte e corrompe caracteres multibyte.
+repeat_str() {
+    local s=$1 n=$2 i out=''
+    for ((i = 0; i < n; i++)); do out+="$s"; done
+    printf '%s' "$out"
+}
+
+# make_bar()
+# Constrói uma barra de progresso: <preenchidos> <largura total>.
+# Usa loop (não printf com seq) para não imprimir caractere espúrio quando 0.
+make_bar() {
+    local filled=$1 width=$2 i out=''
+    for ((i = 0; i < filled; i++)); do out+="$BAR_FILL"; done
+    for ((i = filled; i < width; i++)); do out+="$BAR_EMPTY"; done
+    printf '%s' "$out"
 }
 
 # check_result()
@@ -69,13 +172,13 @@ check_result() {
     local tool=$1
     local exit_code=$2
     local output=$3
-    
-    if [ $exit_code -ne 0 ]; then
-        log "ERRO" "Falha ao instalar $tool: $output"
+
+    if [ "$exit_code" -ne 0 ]; then
+        log "ERRO" "Falha ao instalar $tool: $output" "no_console_output"
         failed_tools+=("$tool")
         return 1
     else
-        log "INFO" "$tool instalado com sucesso"
+        log "INFO" "$tool instalado com sucesso" "no_console_output"
         return 0
     fi
 }
@@ -91,17 +194,13 @@ check_os() {
             OS="kali"
             log "INFO" "Kali Linux detectado: $VERSION_ID" "no_console_output"
             echo -e "${GREEN}[INFO]${NC} Kali Linux $VERSION_ID detectado"
-            
+
         elif [[ $ID == "debian" || $ID == "raspbian" ]]; then
-            if [[ $VERSION_ID -lt 9 ]]; then
+            if [[ ${VERSION_ID:-0} =~ ^[0-9]+$ ]] && [[ $VERSION_ID -lt 9 ]]; then
                 log "AVISO" "Versão do Debian não suportada: $VERSION_ID (recomendado >= 9)" "no_console_output"
                 echo -e "${YELLOW}[AVISO]${NC} Sua versão do Debian $VERSION_ID não é oficialmente suportada."
                 echo -e "${YELLOW}[AVISO]${NC} Recomendado: Debian 9 ou superior."
-                echo -e "${YELLOW}[AVISO]${NC} Continuar mesmo assim? (por sua conta e risco)"
-                until [[ $CONTINUE =~ (s|n) ]]; do
-                    read -rp "Continuar? [s/n]: " -e CONTINUE
-                done
-                if [[ $CONTINUE == "n" ]]; then
+                if ! confirm "$(echo -e "${YELLOW}[AVISO]${NC} Continuar mesmo assim? (s/n): ")"; then
                     log "INFO" "Instalação abortada pelo usuário devido a versão do sistema não suportada"
                     exit 1
                 fi
@@ -109,15 +208,11 @@ check_os() {
         elif [[ $ID == "ubuntu" ]]; then
             OS="ubuntu"
             MAJOR_UBUNTU_VERSION=$(echo "$VERSION_ID" | cut -d '.' -f1)
-            if [[ $MAJOR_UBUNTU_VERSION -lt 22 ]]; then
+            if [[ ${MAJOR_UBUNTU_VERSION:-0} =~ ^[0-9]+$ ]] && [[ $MAJOR_UBUNTU_VERSION -lt 22 ]]; then
                 log "AVISO" "Versão do Ubuntu não suportada: $VERSION_ID (recomendado >= 22.04)" "no_console_output"
                 echo -e "${YELLOW}[AVISO]${NC} Sua versão do Ubuntu $VERSION_ID não é oficialmente suportada."
                 echo -e "${YELLOW}[AVISO]${NC} Recomendado: Ubuntu 22.04 ou superior."
-                echo -e "${YELLOW}[AVISO]${NC} Continuar mesmo assim? (por sua conta e risco)"
-                until [[ $CONTINUE =~ (s|n) ]]; do
-                    read -rp "Continuar? [s/n]: " -e CONTINUE
-                done
-                if [[ $CONTINUE == "n" ]]; then
+                if ! confirm "$(echo -e "${YELLOW}[AVISO]${NC} Continuar mesmo assim? (s/n): ")"; then
                     log "INFO" "Instalação abortada pelo usuário devido a versão do sistema não suportada"
                     exit 1
                 fi
@@ -126,11 +221,7 @@ check_os() {
             log "AVISO" "Distribuição Linux $ID não testada. Baseado em Debian, tentando prosseguir." "no_console_output"
             echo -e "${YELLOW}[AVISO]${NC} Distribuição Linux $ID não foi testada oficialmente."
             echo -e "${YELLOW}[AVISO]${NC} Baseada em Debian, tentando prosseguir."
-            echo -e "${YELLOW}[AVISO]${NC} Continuar mesmo assim? (por sua conta e risco)"
-            until [[ $CONTINUE =~ (s|n) ]]; do
-                read -rp "Continuar? [s/n]: " -e CONTINUE
-            done
-            if [[ $CONTINUE == "n" ]]; then
+            if ! confirm "$(echo -e "${YELLOW}[AVISO]${NC} Continuar mesmo assim? (s/n): ")"; then
                 log "INFO" "Instalação abortada pelo usuário devido a distribuição não suportada"
                 exit 1
             fi
@@ -152,15 +243,19 @@ check_os() {
 # Função para verificar espaço em disco
 check_disk_space() {
     # min_space é definido no arquivo myReconVPS.tools
-    local available=$(df -BG / | awk '{print $4}' | tail -1 | tr -d 'G')
-    
+    local available
+    available=$(df -P -BG / | awk 'NR==2 {gsub(/G/,"",$4); print $4}')
+
+    if ! [[ "$available" =~ ^[0-9]+$ ]]; then
+        log "AVISO" "Não foi possível determinar o espaço em disco disponível" "no_console_output"
+        return 0
+    fi
+
     if [ "$available" -lt "$min_space" ]; then
         log "AVISO" "Espaço em disco insuficiente: $available GB. Mínimo recomendado: $min_space GB" "no_console_output"
         echo -e "${YELLOW}[AVISO]${NC} Espaço em disco disponível: $available GB"
         echo -e "${YELLOW}[AVISO]${NC} Espaço mínimo recomendado: $min_space GB"
-        echo -n -e "\n${YELLOW}[AVISO]${NC} Deseja continuar mesmo assim? (s/n): "
-        read -r choice
-        if [[ "$choice" != "s" && "$choice" != "S" ]]; then
+        if ! confirm "$(echo -e "\n${YELLOW}[AVISO]${NC} Deseja continuar mesmo assim? (s/n): ")"; then
             log "INFO" "Instalação abortada pelo usuário devido a espaço em disco insuficiente"
             exit 1
         fi
@@ -185,8 +280,7 @@ check_dependencies() {
         echo -e "${YELLOW}[AVISO]${NC} Instalando dependencias..."
         apt-get update > /dev/null 2>&1
         for dep in "${missing_deps[@]}"; do
-            apt-get install -y "$dep" > /dev/null 2>&1
-            if [ $? -ne 0 ]; then
+            if ! apt-get install -y "$dep" > /dev/null 2>&1; then
                 log "ERRO" "Falha ao instalar dependencia: $dep" "no_console_output"
                 echo -e "${RED}[ERRO]${NC} Falha ao instalar dependencia: $dep"
                 exit 1
@@ -196,22 +290,41 @@ check_dependencies() {
     fi
 }
 
+# configure_pip()
+# Habilita break-system-packages para contornar o PEP 668 (Debian 12+/Kali),
+# senão todo 'pip3 install' falha com "externally-managed-environment".
+configure_pip() {
+    local rc pip_dir pip_conf
+    for rc in "${RC_FILES[@]}"; do
+        pip_dir="$(dirname "$rc")/.config/pip"
+        pip_conf="$pip_dir/pip.conf"
+        [ -f "$pip_conf" ] && grep -q 'break-system-packages' "$pip_conf" 2>/dev/null && continue
+        mkdir -p "$pip_dir"
+        printf '[global]\nbreak-system-packages = true\n' >> "$pip_conf"
+        log "INFO" "pip configurado para PEP 668 em $pip_conf" "no_console_output"
+    done
+}
+
 # save_state()
-# Função para salvar o estado atual da instalação
+# Função para salvar o estado atual da instalação.
+# Serializa arrays com %q para que a leitura via 'source' seja segura.
 save_state() {
     local progress=$1
-    local tools_done="${@:2}"
-    
-    # Salvar todas as ferramentas selecionadas (ordem atual de instalação)
-    # Envolver em aspas para evitar problemas com espaços e caracteres especiais
-    local selected_tools=("${order[@]}")
-    
-    echo "PROGRESS=$progress" > "$RESUME_FILE"
-    # Usar arrays para evitar que nomes de ferramentas sejam interpretados como comandos
-    echo "TOOLS_DONE=(${tools_done// /' '})" >> "$RESUME_FILE"
-    echo "SELECTED_TOOLS=(${selected_tools[@]})" >> "$RESUME_FILE"
-    echo "TIMESTAMP=$(date +%s)" >> "$RESUME_FILE"
-    
+    shift
+    local tools_done=("$@")
+
+    {
+        printf 'PROGRESS=%q\n' "$progress"
+        printf 'TIMESTAMP=%q\n' "$(date +%s)"
+        printf 'STATE_VERSION=%q\n' "$SCRIPT_VERSION"
+        printf 'TOOLS_DONE=('
+        ((${#tools_done[@]})) && printf '%q ' "${tools_done[@]}"
+        printf ')\n'
+        printf 'SELECTED_TOOLS=('
+        ((${#order[@]})) && printf '%q ' "${order[@]}"
+        printf ')\n'
+    } > "$RESUME_FILE"
+
     log "INFO" "Estado da instalação salvo (progresso: $progress, selecionadas: ${#order[@]})"
 }
 
@@ -221,23 +334,21 @@ load_state() {
     if [ -f "$RESUME_FILE" ]; then
         # Usar o . (ponto) em vez de source para carregar o arquivo, é mais seguro
         . "$RESUME_FILE"
-        
-        # Verificar se todas as variáveis necessárias existem e são arrays
-        if [ -n "$PROGRESS" ] && [ ${#TOOLS_DONE[@]} -ge 0 ] && [ -n "$TIMESTAMP" ] && [ ${#SELECTED_TOOLS[@]} -gt 0 ]; then
+
+        # Validar que as variáveis essenciais existem e são coerentes
+        if [[ "${PROGRESS:-}" =~ ^[0-9]+$ ]] && [ -n "${TIMESTAMP:-}" ] && [ "${#SELECTED_TOOLS[@]}" -gt 0 ]; then
             local current_time=$(date +%s)
             local elapsed=$((current_time - TIMESTAMP))
             local elapsed_formatted=$(printf "%02d:%02d:%02d" $((elapsed/3600)) $(( (elapsed%3600)/60 )) $((elapsed%60)))
-            
+
             # Ferramentas pendentes (usando slicing de array)
             local pending_tools=("${SELECTED_TOOLS[@]:$PROGRESS}")
-            
+
             echo -e "${YELLOW}[AVISO]${NC} Encontrada instalação incompleta iniciada há $elapsed_formatted"
             echo -e "${YELLOW}[AVISO]${NC} Progresso: $PROGRESS de ${#SELECTED_TOOLS[@]} ferramentas"
             echo -e "${YELLOW}[AVISO]${NC} Ferramentas já instaladas: ${TOOLS_DONE[*]}"
             echo -e "${YELLOW}[AVISO]${NC} Ferramentas pendentes: ${pending_tools[*]}"
-            echo -n -e "\n${YELLOW}[AVISO]${NC} Deseja continuar de onde parou? (s/n): "
-            read -r choice
-            if [[ "$choice" == "s" || "$choice" == "S" ]]; then
+            if confirm "$(echo -e "\n${YELLOW}[AVISO]${NC} Deseja continuar de onde parou? (s/n): ")"; then
                 # Restaurar a seleção de ferramentas original
                 order=("${SELECTED_TOOLS[@]}")
                 log "INFO" "Continuando instalação a partir do progresso: $PROGRESS com ${#order[@]} ferramentas selecionadas"
@@ -254,6 +365,40 @@ load_state() {
     return 1
 }
 
+# build_menu_groups()
+# Lê o arquivo de ferramentas e mapeia cada índice de "order" à sua categoria,
+# usando os marcadores '# CATEGORY: <nome>'. Usado apenas para exibir o menu.
+build_menu_groups() {
+    local cur="Outros" line idx=0
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^#[[:space:]]*CATEGORY:[[:space:]]*(.+)$ ]]; then
+            cur="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^order\+=\(\"([^\"]+)\"\) ]]; then
+            menu_cat_of[$idx]="$cur"
+            idx=$((idx+1))
+        fi
+    done < "$TOOLS_CONF"
+}
+
+# print_menu()
+# Exibe as ferramentas agrupadas por categoria, em colunas alinhadas.
+# A numeração é a posição global em "order" (compatível com a seleção).
+print_menu() {
+    local cols=3 i cur="" col=0
+    for i in "${!order[@]}"; do
+        local cat="${menu_cat_of[$i]:-Outros}"
+        if [ "$cat" != "$cur" ]; then
+            [ -n "$cur" ] && [ $col -ne 0 ] && printf '\n'
+            cur="$cat"; col=0
+            printf "\n${PURPLE}${BOLD}${ARROW} %s${NC}\n" "$cur"
+        fi
+        printf "  ${CYAN}%3d.${NC} %-20s" $((i+1)) "${order[$i]}"
+        col=$((col+1))
+        if [ $col -eq $cols ]; then printf '\n'; col=0; fi
+    done
+    [ $col -ne 0 ] && printf '\n'
+}
+
 # select_tools()
 # Função para exibir menu de seleção de ferramentas
 select_tools() {
@@ -261,56 +406,100 @@ select_tools() {
     if [ "$INSTALL_ALL" == "true" ] || [ "$RESUME_INSTALL" == "true" ]; then
         return
     fi
-    
-    echo -e "\n${CYAN}=== Selecione as ferramentas para instalação ===${NC}"
-    echo -e "${CYAN}0. ${NC}Instalar e/ou atualizar todas as ferramentas"
-    
-    local i=1
-    for tool in "${order[@]}"; do
-        echo -e "${CYAN}$i. ${NC}$tool"
-        i=$((i+1))
-    done
-    
-    echo -e "\n${YELLOW}Digite os números das ferramentas separados por espaço (ex: 1 3 5)${NC}"
-    echo -n -e "${YELLOW}ou digite '0' para instalar todas:${NC} "
+
+    echo -e "\n${CYAN}${BOLD}=== Selecione as ferramentas para instalação ===${NC}"
+    print_menu
+    echo -e "\n${DIM}Legenda: 0 ou 'a' = todas · ex: 1 3 5 · 'q' = sair${NC}"
+    echo -n -e "${YELLOW}Digite os números (separados por espaço):${NC} "
     read -r choices
-    
-    if [[ "$choices" == "0" ]]; then
+
+    if [[ "$choices" == "q" || "$choices" == "Q" ]]; then
+        echo -e "${YELLOW}[AVISO]${NC} Seleção cancelada pelo usuário."
+        exit 0
+    fi
+
+    if [[ "$choices" == "0" || "$choices" == "a" || "$choices" == "A" ]]; then
         return
     fi
-    
+
     # Criar uma cópia da ordem original
     local original_order=("${order[@]}")
+    local seen=""
     order=()
-    
+
     for choice in $choices; do
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -gt 0 ] && [ "$choice" -le "${#original_order[@]}" ]; then
-            order+=("${original_order[$((choice-1))]}")
+            # De-duplicar índices repetidos (ex: "1 1 3")
+            if [[ " $seen " != *" $choice "* ]]; then
+                order+=("${original_order[$((choice-1))]}")
+                seen+=" $choice"
+            fi
         fi
     done
-    
+
     # Verificar se foram selecionadas ferramentas válidas
     if [ ${#order[@]} -eq 0 ]; then
         echo -e "${RED}[ERRO]${NC} Nenhuma ferramenta válida selecionada. Saindo."
         exit 1
     fi
-        
+
     echo -e "\n${GREEN}Selecionadas ${#order[@]} ferramentas para instalação:${NC}"
     for tool in "${order[@]}"; do
         echo -e "${GREEN}- ${NC}$tool"
     done
-    
+
     # Confirmação antes de continuar e criar o arquivo de estado
-    echo -n -e "\n${YELLOW}Continuar com a instalação destas ferramentas? (s/n): ${NC}"
-    read -r confirm
-    if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
+    if ! confirm "$(echo -e "\n${YELLOW}Continuar com a instalação destas ferramentas? (s/n): ${NC}")"; then
         echo -e "${YELLOW}[AVISO]${NC} Instalação cancelada pelo usuário."
         exit 0
     fi
-    
+
     # Só salvamos o estado após a confirmação do usuário
     # Isso evita criar o arquivo .install_state prematuramente
-    save_state 0 ""
+    save_state 0
+}
+
+# run_with_spinner()
+# Executa um comando em background exibindo um spinner (apenas em TTY),
+# e captura saída, código de saída e duração.
+# Resultado em: LAST_OUTPUT, LAST_DURATION (e o código de retorno da função).
+run_with_spinner() {
+    local label=$1 cmd=$2 tmp t0=$SECONDS pid rc f=0
+    tmp=$(mktemp)
+
+    ( eval "$cmd" ) > "$tmp" 2>&1 &
+    pid=$!
+
+    if [ -t 1 ]; then
+        while kill -0 "$pid" 2>/dev/null; do
+            printf "\r\e[K${CYAN}%s${NC} Instalando ${BOLD}%s${NC}..." "${SPIN[f % ${#SPIN[@]}]}" "$label"
+            f=$((f+1))
+            sleep 0.1
+        done
+        printf "\r\e[K"
+    fi
+
+    wait "$pid"; rc=$?
+    LAST_OUTPUT=$(<"$tmp")
+    rm -f "$tmp"
+    LAST_DURATION=$((SECONDS - t0))
+    return $rc
+}
+
+# status_line()
+# Exibe o status de uma ferramenta, alinhado com "dotted leaders" e timing.
+# Uso: status_line OK|ERR|SKIP <tool> <segundos>
+status_line() {
+    local tag=$1 tool=$2 secs=$3 color leaders pad
+    case $tag in
+        OK)  color=$GREEN ;;
+        ERR) color=$RED ;;
+        *)   color=$YELLOW ;;
+    esac
+    pad=$((38 - ${#tool}))
+    [ $pad -lt 1 ] && pad=1
+    leaders=$(printf '%*s' "$pad" '' | tr ' ' '.')
+    printf "${color}[%-4s]${NC} %s ${DIM}%s${NC} ${DIM}%ds${NC}\n" "$tag" "$tool" "$leaders" "$secs"
 }
 
 # show_progress()
@@ -318,39 +507,55 @@ select_tools() {
 show_progress() {
     local current=$1
     local total=$2
-    local tool_name=$3
 
     if [ -z "$current" ] || [ -z "$total" ] || [ "$total" -eq 0 ]; then
         return
     fi
 
+    local width=40
     local perc=$(( (current * 100) / total ))
-    local filled=$(( (perc * 50) / 100 ))
-    local unfilled=$(( 50 - filled ))
-    local status=""
-    
-    # Determina a cor com base no percentual de conclusão
-    local color="${BLUE}"
-    if [ "$perc" -lt 99 ]; then
-        color="${RED}"
-    elif [ "$perc" -le 100 ]; then
-        color="${GREEN}"
-    fi
-    
-    # Move o cursor uma linha para cima e atualiza a barra de progresso
-    echo -ne "\r\e[KProgresso: |${color}$(printf '#%.0s' $(seq 1 $filled))${NC}$(printf ' %.0s' $(seq 1 $unfilled))| ${color}$perc%${NC}\n"
+    local filled=$(( (perc * width) / 100 ))
+
+    local color="${RED}"
+    [ "$perc" -ge 100 ] && color="${GREEN}"
+
+    # Segmento preenchido (colorido) + segmento vazio, somando exatamente 'width'
+    printf "${DIM}[%d/%d]${NC} |${color}%s${NC}%s| ${color}%3d%%${NC}\n" \
+        "$current" "$total" "$(make_bar "$filled" "$filled")" "$(make_bar 0 $((width - filled)))" "$perc"
+}
+
+# draw_box()
+# Desenha uma caixa com título e linhas de conteúdo (box-drawing).
+# Uso: draw_box "Título" "linha 1" "linha 2" ...
+draw_box() {
+    local title=$1; shift
+    local width=48 line fill
+    # Cabeçalho
+    fill=$((width - ${#title} - 3))
+    [ $fill -lt 0 ] && fill=0
+    printf "${CYAN}%s%s %s %s%s${NC}\n" "$BOX_TL" "$BOX_H" "$title" \
+        "$(repeat_str "$BOX_H" "$fill")" "$BOX_TR"
+    # Conteúdo (largura visível calculada sem contar códigos ANSI)
+    for line in "$@"; do
+        local visible; visible=$(echo -e "$line" | sed -E 's/\x1b\[[0-9;]*m//g')
+        local padlen=$((width - ${#visible} - 1))
+        [ $padlen -lt 0 ] && padlen=0
+        printf "${CYAN}%s${NC} %b%*s${CYAN}%s${NC}\n" "$BOX_V" "$line" "$padlen" '' "$BOX_V"
+    done
+    # Rodapé
+    printf "${CYAN}%s%s%s${NC}\n" "$BOX_BL" "$(repeat_str "$BOX_H" "$width")" "$BOX_BR"
 }
 
 # handle_interrupt()
 # Função para tratamento de interrupções (CTRL+C)
 handle_interrupt() {
     echo -e "\n${YELLOW}[AVISO]${NC} Instalação interrompida pelo usuário"
-    
+
     # Só salvar o estado se já estivermos no processo de instalação
     # (após o menu de seleção de ferramentas)
     if [ "$INSTALLATION_STARTED" == "true" ]; then
         log "AVISO" "Instalação interrompida pelo usuário no progresso: $progress de $total_commands"
-        save_state "$progress" "${installed_tools[*]}"
+        save_state "$progress" "${installed_tools[@]}"
         echo -e "${YELLOW}[AVISO]${NC} Estado da instalação salvo. Execute novamente o script para continuar."
     else
         log "AVISO" "Script interrompido pelo usuário antes do início da instalação"
@@ -362,7 +567,45 @@ handle_interrupt() {
 }
 
 
+# ============================================================================
 # Corra Forrest, corra...
+# ============================================================================
+
+# Processar opções de linha de comando ANTES de qualquer verificação/banner,
+# para que "-h" funcione sem root e sem rodar as checagens de sistema.
+while getopts ":hany-:" opt; do
+    case "$opt" in
+    h) SHOW_HELP=true ;;
+    a) INSTALL_ALL=true ;;
+    n) DRY_RUN=true ;;
+    y) ASSUME_YES=true ;;
+    -)
+        case "$OPTARG" in
+        help)     SHOW_HELP=true ;;
+        all)      INSTALL_ALL=true ;;
+        dry-run)  DRY_RUN=true ;;
+        yes)      ASSUME_YES=true ;;
+        no-color) USE_COLOR=off ;;
+        *)        echo "Opção inválida: --$OPTARG" 1>&2; INVALID_OPT=true ;;
+        esac ;;
+    \?) echo "Opção inválida: -$OPTARG" 1>&2; INVALID_OPT=true ;;
+    esac
+done
+shift $((OPTIND - 1))
+
+# Configurar cores/glifos (depende de USE_COLOR já ter sido processado)
+setup_ui
+
+if [ "$INVALID_OPT" = true ]; then
+    echo -e "${YELLOW}[DICA]${NC} Use -h para ajuda\n"
+    exit 1
+fi
+
+if [ "$SHOW_HELP" = true ]; then
+    print_help
+    exit 0
+fi
+
 banner
 
 # Checar privilégios de superusuário
@@ -376,11 +619,27 @@ fi
 mkdir -p "$(dirname "$LOG_FILE")"
 echo "# Log de instalação iniciado em $(date '+%Y-%m-%d %H:%M:%S')" > "$LOG_FILE"
 log "INFO" "Iniciando execução do script myReconVPS.sh v$SCRIPT_VERSION" "no_console_output"
+[ "$DRY_RUN" = true ] && log "INFO" "Modo dry-run ativado (nenhuma alteração será feita)"
 
-# Identificar tipo de shell
-SHELL_TYPE=$(basename "$SHELL")
-CONFIG_FILE=$HOME/$(case $SHELL_TYPE in bash) echo '.bashrc' ;; zsh) echo '.zshrc' ;; *) echo '.profile' ;; esac)
-log "INFO" "Shell detectado: $SHELL_TYPE, usando arquivo de configuração: $CONFIG_FILE" "no_console_output"
+# Determinar arquivos de configuração de shell do ROOT e do usuário do sudo.
+# Fixar HOME=/root para que '~' e '~/go/bin' sejam consistentes durante o build.
+rc_for_shell() { case "$1" in bash) echo .bashrc ;; zsh) echo .zshrc ;; *) echo .profile ;; esac; }
+
+ROOT_HOME=$(getent passwd root | cut -d: -f6); ROOT_HOME=${ROOT_HOME:-/root}
+ROOT_SHELL=$(basename "$(getent passwd root | cut -d: -f7)")
+export HOME="$ROOT_HOME"
+CONFIG_FILE="$ROOT_HOME/$(rc_for_shell "$ROOT_SHELL")"
+export CONFIG_FILE
+RC_FILES=("$CONFIG_FILE")
+
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+    USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    USER_SHELL=$(basename "$(getent passwd "$SUDO_USER" | cut -d: -f7)")
+    if [ -n "$USER_HOME" ]; then
+        RC_FILES+=("$USER_HOME/$(rc_for_shell "$USER_SHELL")")
+    fi
+fi
+log "INFO" "Arquivos de configuração de shell: ${RC_FILES[*]}" "no_console_output"
 
 # Carregar configurações de ferramentas
 TOOLS_CONF="$SCRIPT_DIR/myReconVPS.tools"
@@ -404,6 +663,9 @@ if [ ${#order[@]} -eq 0 ]; then
     exit 1
 fi
 
+# Mapear categorias para o menu
+build_menu_groups
+
 # Checar compatibilidade com o sistema operacional
 check_os
 
@@ -413,33 +675,11 @@ check_disk_space
 # Verificar instalação de dependências
 check_dependencies
 
-# Opções de linha de comando
-while getopts ":ha" opt; do
-    case ${opt} in
-    h )
-        echo -e "\n${CYAN}Uso:${NC} $0 [-h] [-a]\n"
-        echo -e "${CYAN}Opções:${NC}"
-        echo -e "  -h\tExibe esta ajuda"
-        echo -e "  -a\tInstala todas as ferramentas sem perguntar\n"
-        exit 0
-        ;;
-    a )
-        INSTALL_ALL=true
-        log "INFO" "Modo de instalação automática ativado (todas as ferramentas)"
-        ;;
-    \? )
-        echo -e "${RED}[ERRO]${NC} Opção inválida: -$OPTARG" 1>&2
-        echo -e "${YELLOW}[DICA]${NC} Use -h para ajuda\n"
-        exit 1
-        ;;
-    esac
-done
+# Configurar pip para o PEP 668 (Debian 12+/Kali)
+configure_pip
 
 # Capturar interrupções
 trap handle_interrupt SIGINT SIGTERM
-
-# Array para armazenar ferramentas instaladas com sucesso
-declare -a installed_tools
 
 # Verificar se deve retomar uma instalação anterior
 progress=0
@@ -474,36 +714,52 @@ log "INFO" "Iniciando processo de instalação das ferramentas"
 # Marcar que a instalação foi iniciada (usado para gerenciar interrupções)
 INSTALLATION_STARTED=true
 
+# Garantir que o Go (instalado em /usr/local/go/bin) e os binários de 'go install'
+# (~/go/bin) estejam no PATH do próprio processo, para que os comandos das
+# ferramentas seguintes encontrem o 'go'. (O 'source' dentro de um subshell não
+# propagava o PATH ao processo pai.)
+export GOPATH="$HOME/go"
+export PATH="$PATH:/usr/local/go/bin:$HOME/go/bin"
+
 for tool in "${order[@]}"; do
-    echo -e "\n---\n"
+    echo -e "\n${DIM}$(repeat_str "$BOX_H" 50)${NC}"
 
     # Verificar se a ferramenta já foi instalada em uma execução anterior
     if [[ " ${installed_tools[*]} " =~ " $tool " ]]; then
         log "INFO" "Pulando $tool... Instalação previamente detectada" "no_console_output"
-        echo -e "${YELLOW}[AVISO]${NC} Pulando $tool... Instalação previamente detectada"
+        status_line SKIP "$tool" 0
         continue
     fi
-    
+
     cmd="${commands[$tool]}"
-    
-    show_progress $progress $total_commands "$tool"
     log "INFO" "Instalando $tool" "no_console_output"
-    echo -e "\n${CYAN}[INFO]${NC} Instalando $tool. ${YELLOW}Aguarde...${NC}"
-    
-    # Capturar saída do comando para log e análise de erro
-    output=$(eval "$cmd" 2>&1)
-    exit_code=$?
-    
+
+    # Executar (ou simular, em dry-run) o comando de instalação
+    if [ "$DRY_RUN" = true ]; then
+        sleep 0.1
+        output="[dry-run] $cmd"
+        exit_code=0
+        duration=0
+    else
+        run_with_spinner "$tool" "$cmd"
+        exit_code=$?
+        output="$LAST_OUTPUT"
+        duration="$LAST_DURATION"
+    fi
+
+    # Após instalar o Go, reafirmar o PATH do processo (defensivo)
+    if [ "$tool" = "go" ] && [ "$exit_code" -eq 0 ]; then
+        export PATH="$PATH:/usr/local/go/bin:$HOME/go/bin"
+    fi
+
     # Verificar resultado da instalação
     if ! check_result "$tool" "$exit_code" "$output"; then
-        log "ERRO" "Detalhes do erro: $output"
-        echo -e "${RED}[ERRO]${NC} Falha ao instalar $tool"
+        status_line ERR "$tool" "$duration"
+        log "ERRO" "Detalhes do erro: $output" "no_console_output"
         echo -e "${YELLOW}[DICA]${NC} Verifique o log para mais detalhes: $LOG_FILE"
-        echo -n -e "\n${YELLOW}[AVISO]${NC} Deseja continuar com as próximas ferramentas? (s/n): "
-        read -r choice
-        if [[ "$choice" != "s" && "$choice" != "S" ]]; then
+        if ! confirm "$(echo -e "\n${YELLOW}[AVISO]${NC} Deseja continuar com as próximas ferramentas? (s/n): ")"; then
             log "INFO" "Instalação interrompida pelo usuário após falha em: $tool"
-            save_state "$progress" "${installed_tools[*]}"
+            save_state "$progress" "${installed_tools[@]}"
             exit 1
         fi
         # Adiciona à lista de ferramentas puladas
@@ -512,49 +768,47 @@ for tool in "${order[@]}"; do
         # Adiciona à lista de ferramentas instaladas com sucesso
         installed_tools+=("$tool")
         # Grava o progresso atual para possível retomada
-        save_state "$progress" "${installed_tools[*]}"
-        echo -e "${GREEN}[OK]${NC} $tool instalado com sucesso"
-
-        # Recarrega o arquivo de configuração para tornar a ferramenta disponível imediatamente
-        if [ -f "$CONFIG_FILE" ]; then
-            source "$CONFIG_FILE" 2>/dev/null || true
-        fi
+        save_state "$progress" "${installed_tools[@]}"
+        status_line OK "$tool" "$duration"
     fi
 
     progress=$((progress + 1))
+    show_progress $progress $total_commands
 done
 
 end_time=$(date +%s)
 execution_time=$((end_time - start_time))
 execution_time_formatted=$(printf "%02d:%02d:%02d" $((execution_time/3600)) $(( (execution_time%3600)/60 )) $((execution_time%60)))
 
-echo -e "\n---\n"
+echo -e "\n${DIM}$(repeat_str "$BOX_H" 50)${NC}\n"
 
 show_progress $total_commands $total_commands
-echo -e "\n${GREEN}Instalação concluída!${NC}"
+echo -e "\n${GREEN}${BOLD}Instalação concluída!${NC}\n"
 log "INFO" "Processo de instalação finalizado em $execution_time_formatted"
 
-# Exibir resumo das instalações
-echo -e "\n${CYAN}[RESUMO DA INSTALAÇÃO]${NC}"
-echo -e "${CYAN}Tempo total:${NC} $execution_time_formatted"
-echo -e "${CYAN}Ferramentas solicitadas:${NC} $total_commands"
-echo -e "${CYAN}Ferramentas instaladas:${NC} ${#installed_tools[@]}"
+# Exibir resumo das instalações (em caixa)
+draw_box "RESUMO DA INSTALACAO" \
+    "${CYAN}Tempo total:${NC}      $execution_time_formatted" \
+    "${CYAN}Solicitadas:${NC}      $total_commands" \
+    "${CYAN}Instaladas:${NC}       ${#installed_tools[@]}" \
+    "${CYAN}Com falha:${NC}        ${#failed_tools[@]}" \
+    "${CYAN}Puladas:${NC}          ${#skipped_tools[@]}"
 
 if [ ${#failed_tools[@]} -gt 0 ]; then
-    echo -e "\n${RED}[FERRAMENTAS COM FALHA]${NC}"
+    echo -e "\n${RED}${BOLD}[FERRAMENTAS COM FALHA]${NC}"
     for tool in "${failed_tools[@]}"; do
         echo -e "${RED}- ${NC}$tool"
     done
 fi
 
 if [ ${#skipped_tools[@]} -gt 0 ]; then
-    echo -e "\n${YELLOW}[FERRAMENTAS PULADAS]${NC}"
+    echo -e "\n${YELLOW}${BOLD}[FERRAMENTAS PULADAS]${NC}"
     for tool in "${!skipped_tools[@]}"; do
         echo -e "${YELLOW}- ${NC}$tool: ${skipped_tools[$tool]}"
     done
 fi
 
-echo -e "\n${GREEN}[FERRAMENTAS INSTALADAS]${NC}"
+echo -e "\n${GREEN}${BOLD}[FERRAMENTAS INSTALADAS]${NC}"
 for tool in "${installed_tools[@]}"; do
     echo -e "${GREEN}- ${NC}$tool"
 done
@@ -565,5 +819,8 @@ if [ $progress -eq $total_commands ]; then
     rm -f "$RESUME_FILE"
 fi
 
+echo -e "\n${YELLOW}Atualize a sessão atual do shell com o comando:${NC}"
+echo -e " ${YELLOW}source $CONFIG_FILE${NC}"
+
 log "INFO" "Execução do script finalizada com sucesso" "no_console_output"
-echo -e "\n${GREEN}Hack the Planet!${NC}"
+echo -e "\n${GREEN}${BOLD}Hack the Planet!${NC}"
