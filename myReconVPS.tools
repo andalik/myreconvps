@@ -208,7 +208,7 @@ order+=("massdns")
 commands["meg"]="go install github.com/tomnomnom/meg@latest && mkdir -p /opt/meg ; mv -f ~/go/bin/meg /opt/meg/ && add_path /opt/meg"
 order+=("meg")
 
-commands["metabigor"]="git clone https://github.com/j3ssie/metabigor.git && cd metabigor && go install && cd .. && rm -rf metabigor && mkdir -p /opt/metabigor ; mv -f ~/go/bin/metabigor /opt/metabigor/ && add_path /opt/metabigor"
+commands["metabigor"]="git clone https://github.com/j3ssie/metabigor.git && cd metabigor && go mod tidy && make build && make install && cd .. && rm -rf metabigor && mkdir -p /opt/metabigor ; mv -f ~/go/bin/metabigor /opt/metabigor/ && add_path /opt/metabigor"
 order+=("metabigor")
 
 commands["mildew"]="go install github.com/daehee/mildew/cmd/mildew@latest && mkdir -p /opt/mildew ; mv -f ~/go/bin/mildew /opt/mildew/ && add_path /opt/mildew"
