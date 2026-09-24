@@ -9,7 +9,7 @@
 
 **myReconVPS** automatiza a instalação e a atualização de um arsenal de ferramentas de reconhecimento e pentest em VPS baseadas em Debian, deixando tudo pronto no `PATH` com um único comando.
 
-`v1.2607.006` · by Andalik
+`v1.2609.006` · by Andalik
 
 ### Requisitos
 - Distribuição baseada em Debian: **Debian 9+**, **Ubuntu 22.04+**, **Kali Linux** ou **Raspbian**
