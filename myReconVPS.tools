@@ -1,7 +1,7 @@
 # myReconVPS.tools - Arquivo de configuração de ferramentas
 # Renato Andalik
 
-# ULTIMA ATUALIZACAO: 19/07/2026
+# ULTIMA ATUALIZACAO: 24/09/2026
 
 # INSTRUCOES
 # Adicione comandos para instalacao de ferramentas no formato:
@@ -226,7 +226,7 @@ order+=("nikto")
 commands["nilo"]="go install github.com/ferreiraklet/nilo@latest && mkdir -p /opt/nilo ; mv -f ~/go/bin/nilo /opt/nilo/ && add_path /opt/nilo"
 order+=("nilo")
 
-commands["nmap"]="apt-get -y install build-essential libssl-dev automake libffi-dev libncurses5-dev zlib1g zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev liblua5.3-dev libbpfcc-dev libpcap-dev libcfg-dev libssh2-1-dev libpcre3-dev libcairo2-dev pkg-config python3-dev python3-venv make gcc && pip3 install build && git clone https://github.com/nmap/nmap.git && cd nmap && make uninstall ; rm -f /usr/local/bin/zenmap ; rm -f /usr/local/share/zenmap ; python_dir=\$(ls /usr/local/lib | grep 'python' | sort -r | head -n 1) ; rm -rf /usr/local/lib/\$python_dir/dist-packages/zenmap* ; ./configure && make && make install && cd .. && rm -rf nmap"
+commands["nmap"]="apt-get -y install build-essential libssl-dev automake libffi-dev libncurses5-dev zlib1g zlib1g-dev libreadline-dev libbz2-dev libsqlite3-dev liblua5.3-dev libbpfcc-dev libpcap-dev libcfg-dev libssh2-1-dev libpcre3-dev libcairo2-dev pkg-config python3-dev python3-venv make gcc && pip3 install build && git clone https://github.com/nmap/nmap.git && cd nmap && make uninstall ; rm -f /usr/local/bin/zenmap ; rm -f /usr/local/share/zenmap ; python_dir=\$(ls /usr/local/lib | grep 'python' | sort -r | head -n 1) ; rm -rf /usr/local/lib/\$python_dir/dist-packages/zenmap* ; ./configure --without-ndiff && make && make install && cd .. && rm -rf nmap"
 order+=("nmap")
 
 commands["notify"]="go install -v github.com/projectdiscovery/notify/cmd/notify@latest && mkdir -p /opt/notify ; mv -f ~/go/bin/notify /opt/notify/ && add_path /opt/notify"
